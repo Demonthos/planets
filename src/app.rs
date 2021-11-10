@@ -7,14 +7,19 @@ use std::mem;
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 pub struct App {
-    #[cfg_attr(feature = "persistence", serde(skip))]
     kd: Kd,
+    #[cfg_attr(feature = "persistence", serde(skip))]
     gravity: f32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
     size: f32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    mass: f32,
     #[cfg_attr(feature = "persistence", serde(skip))]
     creating: Option<egui::Pos2>,
     #[cfg_attr(feature = "persistence", serde(skip))]
-    last_id: i32
+    last_id: i32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    selected: i32
 }
 
 impl Default for App {
@@ -23,8 +28,10 @@ impl Default for App {
             kd: Kd::new(vec![]),
             gravity: 1.0,
             size: 5.0,
+            mass: 5.0,
             creating: None,
-            last_id: 0
+            last_id: 0,
+            selected: -1
         }
     }
 }
@@ -68,21 +75,39 @@ impl epi::App for App {
         let mut old = Vec::new();
         old_kd.drain(&mut |p| old.push(p));
         let pointer = &ctx.input().pointer;
-        if let Some(pos) = self.creating {
-            if pointer.any_released() {
-                old.push(Plannet::new(
-                    pos,
-                    (pos - pointer.hover_pos().unwrap()) / 10.0,
-                    self.size,
-                    self.last_id
-                ));
-                self.last_id += 1;
+        if let Some(hover) = pointer.hover_pos() {
+            if self.selected < 0{
+                if let Some(pos) = self.creating {
+                    if pointer.any_released() {
+                        old.push(Plannet::new(
+                            pos,
+                            (pos - hover) / 10.0,
+                            self.mass,
+                            self.size,
+                            self.last_id
+                        ));
+                        self.last_id += 1;
+                    }
+                }
             }
         }
 
-        // f = g*m1*m2/(d^2)
+        // a = g*m/(d^2)
         self.kd = Kd::new(old.clone());
+        if let Some(i) = pointer.press_origin(){
+            self.selected = -1;
+            self.kd.for_each(&mut |p| {
+                println!("{:?}", p.pos.distance(i));
+                if p.pos.distance(i) <= p.size{
+                    self.selected = p.id;
+                }
+            });
+        }
         self.kd.for_each(&mut |p| p.pos += p.vel);
+        let zoom_dt = ctx.input().scroll_delta.y;
+        if zoom_dt != 0.0{
+            self.gravity *= zoom_dt/50.0;
+        }
 
         let grav = self.gravity;
 
@@ -91,13 +116,21 @@ impl epi::App for App {
                 .iter()
                 .filter(|d| d.id != p.id)
                 .map(|d| {
-                    (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                    // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                    (d.pos - p.pos).normalized() * dt * (grav * grav * d.mass)
                         / d.pos.distance_sq(p.pos)
                 })
                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
         });
         egui::CentralPanel::default().show(ctx, |ui| {
-            let responces = [ui.add(egui::Slider::new(&mut self.gravity, 0.0..=10.0).text("gravity")), ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("mass"))];
+            if self.selected >= 0{
+                let mut selected_pos = None;
+                self.kd.for_each(&mut |p| if p.id == self.selected{selected_pos = Some(p.pos.to_vec2())});
+                if let Some(pos) = selected_pos{
+                    self.kd.for_each(&mut |p| p.pos -= pos-ui.available_size()/2.0);
+                }
+            }
+            let responces = [ui.add(egui::Slider::new(&mut self.gravity, 0.0..=1000.0).text("gravity")), ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")), ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size"))];
             if responces.iter().any(|r| r.hovered()){
                 self.creating = None;
             }
@@ -109,7 +142,7 @@ impl epi::App for App {
             }
             let painter = ui.painter();
             self.kd
-                .for_each(&mut |p| painter.circle_filled(p.pos, p.mass, egui::Color32::BLUE));
+                .for_each(&mut |p| painter.circle_filled(p.pos, p.size, egui::Color32::BLUE));
             if let Some(pos) = self.creating {
                 painter.circle_filled(pos, 10.0, egui::Color32::GREEN);
                 if let Some(hover) = pointer.hover_pos() {
