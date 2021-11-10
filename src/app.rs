@@ -1,7 +1,7 @@
-use std::mem;
-use eframe::{egui, epi};
 use crate::kd::Kd;
 use crate::plannet::Plannet;
+use eframe::{egui, epi};
+use std::mem;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -10,7 +10,7 @@ pub struct App {
     #[cfg_attr(feature = "persistence", serde(skip))]
     kd: Kd,
     gravity: f32,
-    creating: Option<egui::Pos2>
+    creating: Option<egui::Pos2>,
 }
 
 impl Default for App {
@@ -18,7 +18,7 @@ impl Default for App {
         Self {
             kd: Kd::new(vec![]),
             gravity: 1.0,
-            creating: None
+            creating: None,
         }
     }
 }
@@ -59,9 +59,13 @@ impl epi::App for App {
         let mut old = Vec::new();
         old_kd.drain(&mut |p| old.push(p));
         let pointer = &ctx.input().pointer;
-        if let Some(pos) = self.creating{
-            if pointer.any_released(){
-                old.push(Plannet::new(pos, (pos-pointer.hover_pos().unwrap())/10.0, 10.0))
+        if let Some(pos) = self.creating {
+            if pointer.any_released() {
+                old.push(Plannet::new(
+                    pos,
+                    (pos - pointer.hover_pos().unwrap()) / 10.0,
+                    10.0,
+                ))
             }
         }
         self.creating = pointer.press_origin();
@@ -72,15 +76,29 @@ impl epi::App for App {
 
         let grav = self.gravity;
 
-        self.kd.for_each(&mut |p| p.vel += old.iter().filter(|d| d.pos != p.pos).map(|d| (d.pos-p.pos).normalized()*dt*(grav*p.mass*d.mass)/d.pos.distance_sq(p.pos)).fold(egui::Vec2::ZERO, |v1, v2| v1 + v2));
+        self.kd.for_each(&mut |p| {
+            p.vel += old
+                .iter()
+                .filter(|d| d.pos != p.pos)
+                .map(|d| {
+                    (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                        / d.pos.distance_sq(p.pos)
+                })
+                .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
+        });
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add(egui::Slider::new(&mut self.gravity, 0.0..=100.0).text("gravity"));
+            ui.add(egui::Slider::new(&mut self.gravity, 0.0..=10.0).text("gravity"));
             let painter = ui.painter();
-            self.kd.for_each(&mut |p| painter.circle_filled(p.pos, p.mass, egui::Color32::BLUE));
-            if let Some(pos) = self.creating{
+            self.kd
+                .for_each(&mut |p| painter.circle_filled(p.pos, p.mass, egui::Color32::BLUE));
+            if let Some(pos) = self.creating {
                 painter.circle_filled(pos, 10.0, egui::Color32::GREEN);
-                if let Some(hover) = pointer.hover_pos(){
-                    painter.arrow(pos, pos-hover, egui::Stroke::new(1.0, egui::Color32::GREEN));
+                if let Some(hover) = pointer.hover_pos() {
+                    painter.arrow(
+                        pos,
+                        pos - hover,
+                        egui::Stroke::new(1.0, egui::Color32::GREEN),
+                    );
                 }
             }
             egui::warn_if_debug_build(ui);
