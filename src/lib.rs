@@ -5,7 +5,7 @@
 mod app;
 mod kd;
 mod plannet;
-pub use app::TemplateApp;
+pub use app::App;
 
 // ----------------------------------------------------------------------------
 // When compiling for web:
@@ -20,6 +20,6 @@ use eframe::wasm_bindgen::{self, prelude::*};
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub fn start(canvas_id: &str) -> Result<(), eframe::wasm_bindgen::JsValue> {
-    let app = TemplateApp::default();
+    let app = App::default();
     eframe::start_web(canvas_id, Box::new(app))
 }

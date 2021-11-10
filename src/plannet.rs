@@ -1,6 +1,6 @@
 use eframe::egui;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Plannet{
     pub pos: egui::Pos2,
     pub vel: egui::Vec2,

@@ -1,7 +1,7 @@
 use crate::plannet::Plannet;
 use eframe::egui;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Kd{
     Partition{
         x_split: bool,
@@ -60,6 +60,13 @@ impl Kd{
         match self{
             Kd::Partition{x_split: _, split: _, children} => children.iter_mut().for_each(|c| c.for_each(f)),
             Kd::Node(children) => children.iter_mut().for_each(f)
+        }
+    }
+
+    pub fn drain(self, f: &mut impl FnMut(Plannet) -> ()){
+        match self{
+            Kd::Partition{x_split: _, split: _, children} => children.to_vec().into_iter().for_each(|c| c.drain(f)),
+            Kd::Node(children) => children.into_iter().for_each(f)
         }
     }
 }
