@@ -59,6 +59,8 @@ impl epi::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::CtxRef, _frame: &mut epi::Frame<'_>) {
+        ctx.request_repaint();
+
         // let dt = ctx.input().unstable_dt.min(1.0 / 60.0);
         let dt = ctx.input().predicted_dt;
 
