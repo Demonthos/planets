@@ -10,7 +10,11 @@ pub struct App {
     #[cfg_attr(feature = "persistence", serde(skip))]
     kd: Kd,
     gravity: f32,
+    size: f32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
     creating: Option<egui::Pos2>,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    last_id: i32
 }
 
 impl Default for App {
@@ -18,7 +22,9 @@ impl Default for App {
         Self {
             kd: Kd::new(vec![]),
             gravity: 1.0,
+            size: 5.0,
             creating: None,
+            last_id: 0
         }
     }
 }
@@ -53,7 +59,8 @@ impl epi::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::CtxRef, _frame: &mut epi::Frame<'_>) {
-        let dt = ctx.input().unstable_dt.min(1.0 / 30.0);
+        // let dt = ctx.input().unstable_dt.min(1.0 / 60.0);
+        let dt = ctx.input().predicted_dt;
 
         let old_kd = mem::replace(&mut self.kd, Kd::new(vec![]));
         let mut old = Vec::new();
@@ -64,11 +71,12 @@ impl epi::App for App {
                 old.push(Plannet::new(
                     pos,
                     (pos - pointer.hover_pos().unwrap()) / 10.0,
-                    10.0,
-                ))
+                    self.size,
+                    self.last_id
+                ));
+                self.last_id += 1;
             }
         }
-        self.creating = pointer.press_origin();
 
         // f = g*m1*m2/(d^2)
         self.kd = Kd::new(old.clone());
@@ -79,7 +87,7 @@ impl epi::App for App {
         self.kd.for_each(&mut |p| {
             p.vel += old
                 .iter()
-                .filter(|d| d.pos != p.pos)
+                .filter(|d| d.id != p.id)
                 .map(|d| {
                     (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
                         / d.pos.distance_sq(p.pos)
@@ -87,7 +95,13 @@ impl epi::App for App {
                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
         });
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add(egui::Slider::new(&mut self.gravity, 0.0..=10.0).text("gravity"));
+            let responces = [ui.add(egui::Slider::new(&mut self.gravity, 0.0..=10.0).text("gravity")), ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("mass"))];
+            if responces.iter().any(|r| r.hovered()){
+                self.creating = None;
+            }
+            else{
+                self.creating = pointer.press_origin();
+            }
             let painter = ui.painter();
             self.kd
                 .for_each(&mut |p| painter.circle_filled(p.pos, p.mass, egui::Color32::BLUE));
