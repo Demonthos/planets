@@ -14,7 +14,7 @@ pub enum Kd {
 impl Kd {
     pub fn new(mut plannets: Vec<Plannet>) -> Kd {
         let len = plannets.len();
-        if len <= 1 {
+        if len <= 2 {
             Kd::Node(plannets)
         } else {
             let ord = |f1: &f32, f2: &f32| f1.partial_cmp(f2).unwrap();
@@ -68,6 +68,23 @@ impl Kd {
                     split: mean.y,
                     children: [Box::new(Kd::new(plannets)), Box::new(Kd::new(other))],
                 }
+            }
+        }
+    }
+
+    pub fn center_of_mass(&self) -> (f32, egui::Pos2){
+        match self {
+            Kd::Partition {
+                x_split: _,
+                split: _,
+                children,
+            } => {
+                let t = children.iter().map(|c| c.center_of_mass()).map(|e| (e.0, e.1.to_vec2())).fold((0.0, egui::Vec2::ZERO), |com1, com2| (com1.0 + com2.0, (com1.0*com1.1 + com2.0*com2.1)/(com1.0 + com2.0)));
+                (t.0, t.1.to_pos2())
+            },
+            Kd::Node(children) => {
+                let t = children.iter().map(|p| (p.mass, p.pos)).map(|e| (e.0, e.1.to_vec2())).fold((0.0, egui::Vec2::ZERO), |com1, com2| (com1.0 + com2.0, (com1.0*com1.1 + com2.0*com2.1)/(com1.0 + com2.0)));
+                (t.0, t.1.to_pos2())
             }
         }
     }

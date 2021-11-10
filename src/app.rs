@@ -102,6 +102,9 @@ impl epi::App for App {
             else{
                 self.creating = pointer.press_origin();
             }
+            if ui.button("reset").clicked() {
+                self.kd = Kd::new(vec![]);
+            }
             let painter = ui.painter();
             self.kd
                 .for_each(&mut |p| painter.circle_filled(p.pos, p.mass, egui::Color32::BLUE));
@@ -115,6 +118,8 @@ impl epi::App for App {
                     );
                 }
             }
+            let com = self.kd.center_of_mass();
+            painter.circle_filled(com.1, com.0, egui::Color32::RED);
             egui::warn_if_debug_build(ui);
         });
     }
