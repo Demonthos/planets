@@ -147,7 +147,7 @@ impl epi::App for App {
                 self.kd = Kd::new(vec![]);
             }
             if self.force_fields{
-                let size = ctx.available_rect().max;
+                let size = ctx.available_rect().size();
                 for x in 0..(size.x.ceil()/10.0) as usize{
                     for y in 0..(size.y.ceil()/10.0) as usize{
                         let pos = egui::Vec2::new(x as f32, y as f32)*10.0;
@@ -173,7 +173,7 @@ impl epi::App for App {
                     selected_pos = Some(p.pos.to_vec2())
                 });
                 if let Some(pos) = selected_pos{
-                    self.kd.for_each(&mut |p| p.pos -= pos-ui.available_size()/2.0);
+                    self.kd.for_each(&mut |p| p.pos -= pos-ctx.available_rect().size()/2.0);
                 }
             }
             let painter = ui.painter();
