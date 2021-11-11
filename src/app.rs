@@ -81,7 +81,7 @@ impl epi::App for App {
         let mut old = Vec::new();
         old_kd.drain(&mut |p| old.push(p));
         let pointer = &ctx.input().pointer;
-        if let Some(hover) = pointer.hover_pos() {
+        if let Some(hover) = pointer.interact_pos() {
             let old_selected = self.selected;
             if pointer.any_released() {
                 self.selected = -1;
@@ -213,7 +213,7 @@ impl epi::App for App {
             });
             if let Some(pos) = self.creating {
                 painter.circle_filled(pos, self.size, egui::Color32::GREEN);
-                if let Some(hover) = pointer.hover_pos() {
+                if let Some(hover) = pointer.interact_pos() {
                     painter.arrow(
                         pos,
                         pos - hover,
