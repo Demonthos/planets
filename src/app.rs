@@ -83,7 +83,7 @@ impl epi::App for App {
         let pointer = &ctx.input().pointer;
         if let Some(hover) = pointer.interact_pos() {
             let old_selected = self.selected;
-            if pointer.any_released() {
+            if pointer.any_released() || ctx.input().any_touches() {
                 self.selected = -1;
                 old.iter().for_each(&mut |p: &Plannet| {
                     // println!("{:?}", p.pos.distance(i));
@@ -94,7 +94,7 @@ impl epi::App for App {
             }
             if self.selected < 0 {
                 if let Some(pos) = self.creating {
-                    if pointer.any_released() {
+                    if pointer.any_released() || !ctx.input().any_touches() {
                         let mut offset_pos = egui::Vec2::ZERO;
                         let mut offset_vel = egui::Vec2::ZERO;
                         if old_selected >= 0 {
