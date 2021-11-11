@@ -23,7 +23,7 @@ pub struct App {
     #[cfg_attr(feature = "persistence", serde(skip))]
     force_fields: bool,
     #[cfg_attr(feature = "persistence", serde(skip))]
-    min_trail_update: f32
+    min_trail_update: f32,
 }
 
 impl Default for App {
@@ -37,7 +37,7 @@ impl Default for App {
             last_id: 0,
             selected: -1,
             force_fields: false,
-            min_trail_update: 0.1
+            min_trail_update: 0.1,
         }
     }
 }
@@ -82,34 +82,36 @@ impl epi::App for App {
         old_kd.drain(&mut |p| old.push(p));
         let pointer = &ctx.input().pointer;
         if let Some(hover) = pointer.hover_pos() {
-            if pointer.any_released(){
+            if pointer.any_released() {
                 self.selected = -1;
                 old.iter().for_each(&mut |p: &Plannet| {
                     // println!("{:?}", p.pos.distance(i));
-                    if p.pos.distance(hover) <= p.size{
+                    if p.pos.distance(hover) <= p.size {
                         self.selected = p.id;
                     }
                 });
             }
         }
         if let Some(hover) = pointer.hover_pos() {
-            if self.selected < 0{
+            if self.selected < 0 {
                 if let Some(pos) = self.creating {
                     if pointer.any_released() {
                         let mut offset_pos = egui::Vec2::ZERO;
                         let mut offset_vel = egui::Vec2::ZERO;
-                        if self.selected >= 0{
-                            old.iter().for_each(&mut |p: &Plannet| if p.id == self.selected{
-                                offset_pos = p.pos.to_vec2();
-                                offset_vel = p.vel;
+                        if self.selected >= 0 {
+                            old.iter().for_each(&mut |p: &Plannet| {
+                                if p.id == self.selected {
+                                    offset_pos = p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
+                                    offset_vel = p.vel;
+                                }
                             });
                         }
                         old.push(Plannet::new(
-                            pos + offset_pos,
+                            pos - offset_pos,
                             ((pos - hover) / 10.0) + offset_vel,
                             self.mass,
                             self.size,
-                            self.last_id
+                            self.last_id,
                         ));
                         self.last_id += 1;
                     }
@@ -120,22 +122,21 @@ impl epi::App for App {
         // a = g*m/(d^2)
         self.kd = Kd::new(old.clone());
         self.kd.for_each(&mut |p| {
-            if if let Some(l) = p.trail.last(){
-                (*l-p.pos).length_sq() > self.min_trail_update.powf(2.0)
-            }
-            else{
-                true   
-            }{
+            if if let Some(l) = p.trail.last() {
+                (*l - p.pos).length_sq() > self.min_trail_update.powf(2.0)
+            } else {
+                true
+            } {
                 p.trail.push(p.pos);
-                if p.trail.len() > 100{
+                if p.trail.len() > 100 {
                     p.trail.remove(0);
                 }
             }
         });
         self.kd.for_each(&mut |p| p.pos += p.vel);
         let zoom_dt = ctx.input().scroll_delta.y;
-        if zoom_dt != 0.0{
-            self.gravity *= zoom_dt/50.0;
+        if zoom_dt != 0.0 {
+            self.gravity *= zoom_dt / 50.0;
         }
 
         let grav = self.gravity;
@@ -152,53 +153,65 @@ impl epi::App for App {
                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
         });
         egui::CentralPanel::default().show(ctx, |ui| {
-            let responces = [ui.add(egui::Slider::new(&mut self.gravity, 0.0..=500.0).text("gravity")), ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")), ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size")), ui.add(egui::Slider::new(&mut self.min_trail_update, 0.1..=2.0).text("trial length")), ui.checkbox(&mut self.force_fields, "force arrows")];
-            if responces.iter().any(|r| r.hovered()){
+            let responces = [
+                ui.add(egui::Slider::new(&mut self.gravity, 0.0..=500.0).text("gravity")),
+                ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")),
+                ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size")),
+                ui.add(
+                    egui::Slider::new(&mut self.min_trail_update, 0.1..=2.0).text("trial length"),
+                ),
+                ui.checkbox(&mut self.force_fields, "force arrows"),
+            ];
+            if responces.iter().any(|r| r.hovered()) {
                 self.creating = None;
-            }
-            else{
+            } else {
                 self.creating = pointer.press_origin();
             }
             if ui.button("reset").clicked() {
                 self.kd = Kd::new(vec![]);
             }
-            if self.force_fields{
+            if self.force_fields {
                 let size = ctx.available_rect().size();
-                for x in 0..(size.x.ceil()/10.0) as usize{
-                    for y in 0..(size.y.ceil()/10.0) as usize{
-                        let pos = egui::Vec2::new(x as f32, y as f32)*10.0;
+                for x in 0..(size.x.ceil() / 10.0) as usize {
+                    for y in 0..(size.y.ceil() / 10.0) as usize {
+                        let pos = egui::Vec2::new(x as f32, y as f32) * 10.0;
                         let vel = old
-                        .iter()
-                        .map(|d| {
-                            // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                            (d.pos - pos).to_vec2().normalized() * dt * (grav.powf(2.0) * d.mass)
-                            / d.pos.distance_sq(pos.to_pos2())
-                        })
-                        .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
-                        let color = (vel.length()*10000.0/(self.gravity.powf(2.0))).min(1.0);
+                            .iter()
+                            .map(|d| {
+                                // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                                (d.pos - pos).to_vec2().normalized()
+                                    * dt
+                                    * (grav.powf(2.0) * d.mass)
+                                    / d.pos.distance_sq(pos.to_pos2())
+                            })
+                            .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
+                        let color = (vel.length() * 10000.0 / (self.gravity.powf(2.0))).min(1.0);
                         ui.painter().arrow(
                             pos.to_pos2(),
-                            vel.normalized()*10.0,
+                            vel.normalized() * 10.0,
                             egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
                         );
                     }
                 }
             }
-            if self.selected >= 0{
-                let mut selected_pos = None;
-                self.kd.for_each(&mut |p| if p.id == self.selected{
-                    selected_pos = Some(p.pos.to_vec2())
+            let mut selected_pos = egui::Vec2::ZERO;
+            if self.selected >= 0 {
+                self.kd.for_each(&mut |p| {
+                    if p.id == self.selected {
+                        selected_pos = p.pos.to_vec2() - ctx.available_rect().size() / 2.0
+                    }
                 });
-                if let Some(pos) = selected_pos{
-                    self.kd.for_each(&mut |p| p.pos -= pos-ctx.available_rect().size()/2.0);
-                }
             }
             let painter = ui.painter();
-            self.kd
-                .for_each(&mut |p| {
-                    painter.circle_filled(p.pos, p.size, egui::Color32::BLUE);
-                    p.trail.windows(2).for_each(|w| painter.line_segment([w[0], w[1]], egui::Stroke::new(2.0, egui::Color32::BLUE)))
-                });
+            self.kd.for_each(&mut |p| {
+                painter.circle_filled(p.pos - selected_pos, p.size, egui::Color32::BLUE);
+                p.trail.windows(2).for_each(|w| {
+                    painter.line_segment(
+                        [w[0] - selected_pos, w[1] - selected_pos],
+                        egui::Stroke::new(2.0, egui::Color32::BLUE),
+                    )
+                })
+            });
             if let Some(pos) = self.creating {
                 painter.circle_filled(pos, self.size, egui::Color32::GREEN);
                 if let Some(hover) = pointer.hover_pos() {

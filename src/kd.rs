@@ -2,6 +2,7 @@ use crate::plannet::Plannet;
 use eframe::egui;
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 pub enum Kd {
     Partition {
         x_split: bool,
@@ -34,12 +35,13 @@ impl Kd {
                     .iter()
                     .position(|p| p.pos.x > mean.x)
                     .unwrap_or_else(|| {
-                        let same: Vec<_> = plannets
+                        plannets
                             .iter()
                             .enumerate()
                             .filter(|(_, p)| p.pos.x == mean.x)
-                            .collect();
-                        same.len() / 2 + 1
+                            .count()
+                            / 2
+                            + 1
                     });
                 // println!("{:?}: {:?}", split, mean);
                 let other = plannets.split_off(split);
@@ -54,12 +56,13 @@ impl Kd {
                     .iter()
                     .position(|p| p.pos.y > mean.y)
                     .unwrap_or_else(|| {
-                        let same: Vec<_> = plannets
+                        plannets
                             .iter()
                             .enumerate()
                             .filter(|(_, p)| p.pos.y == mean.y)
-                            .collect();
-                        same.len() / 2 + 1
+                            .count()
+                            / 2
+                            + 1
                     });
                 // println!("{:?}: {:?}", split, mean);
                 let other = plannets.split_off(split);
@@ -72,18 +75,36 @@ impl Kd {
         }
     }
 
-    pub fn center_of_mass(&self) -> (f32, egui::Pos2){
+    pub fn center_of_mass(&self) -> (f32, egui::Pos2) {
         match self {
             Kd::Partition {
                 x_split: _,
                 split: _,
                 children,
             } => {
-                let t = children.iter().map(|c| c.center_of_mass()).map(|e| (e.0, e.1.to_vec2())).fold((0.0, egui::Vec2::ZERO), |com1, com2| (com1.0 + com2.0, (com1.0*com1.1 + com2.0*com2.1)/(com1.0 + com2.0)));
+                let t = children
+                    .iter()
+                    .map(|c| c.center_of_mass())
+                    .map(|e| (e.0, e.1.to_vec2()))
+                    .fold((0.0, egui::Vec2::ZERO), |com1, com2| {
+                        (
+                            com1.0 + com2.0,
+                            (com1.0 * com1.1 + com2.0 * com2.1) / (com1.0 + com2.0),
+                        )
+                    });
                 (t.0, t.1.to_pos2())
-            },
+            }
             Kd::Node(children) => {
-                let t = children.iter().map(|p| (p.mass, p.pos)).map(|e| (e.0, e.1.to_vec2())).fold((0.0, egui::Vec2::ZERO), |com1, com2| (com1.0 + com2.0, (com1.0*com1.1 + com2.0*com2.1)/(com1.0 + com2.0)));
+                let t = children
+                    .iter()
+                    .map(|p| (p.mass, p.pos))
+                    .map(|e| (e.0, e.1.to_vec2()))
+                    .fold((0.0, egui::Vec2::ZERO), |com1, com2| {
+                        (
+                            com1.0 + com2.0,
+                            (com1.0 * com1.1 + com2.0 * com2.1) / (com1.0 + com2.0),
+                        )
+                    });
                 (t.0, t.1.to_pos2())
             }
         }
