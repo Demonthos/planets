@@ -19,7 +19,9 @@ pub struct App {
     #[cfg_attr(feature = "persistence", serde(skip))]
     last_id: i32,
     #[cfg_attr(feature = "persistence", serde(skip))]
-    selected: i32
+    selected: i32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    force_fields: bool
 }
 
 impl Default for App {
@@ -31,7 +33,8 @@ impl Default for App {
             mass: 5.0,
             creating: None,
             last_id: 0,
-            selected: -1
+            selected: -1,
+            force_fields: false
         }
     }
 }
@@ -133,16 +136,7 @@ impl epi::App for App {
                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
         });
         egui::CentralPanel::default().show(ctx, |ui| {
-            if self.selected >= 0{
-                let mut selected_pos = None;
-                self.kd.for_each(&mut |p| if p.id == self.selected{
-                    selected_pos = Some(p.pos.to_vec2())
-                });
-                if let Some(pos) = selected_pos{
-                    self.kd.for_each(&mut |p| p.pos -= pos-ui.available_size()/2.0);
-                }
-            }
-            let responces = [ui.add(egui::Slider::new(&mut self.gravity, 0.0..=1000.0).text("gravity")), ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")), ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size"))];
+            let responces = [ui.add(egui::Slider::new(&mut self.gravity, 0.0..=500.0).text("gravity")), ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")), ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size")), ui.checkbox(&mut self.force_fields, "force arrows")];
             if responces.iter().any(|r| r.hovered()){
                 self.creating = None;
             }
@@ -151,6 +145,36 @@ impl epi::App for App {
             }
             if ui.button("reset").clicked() {
                 self.kd = Kd::new(vec![]);
+            }
+            if self.force_fields{
+                let size = ctx.available_rect().max;
+                for x in 0..(size.x.ceil()/10.0) as usize{
+                    for y in 0..(size.y.ceil()/10.0) as usize{
+                        let pos = egui::Vec2::new(x as f32, y as f32)*10.0;
+                        let vel = old
+                        .iter()
+                        .map(|d| {
+                            // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                            (d.pos - pos).to_vec2().normalized() * dt * (grav * grav * d.mass)
+                            / d.pos.distance_sq(pos.to_pos2())
+                        })
+                        .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
+                        ui.painter().arrow(
+                            pos.to_pos2(),
+                            vel.normalized()*10.0,
+                            egui::Stroke::new(1.0, egui::Color32::BLUE),
+                        );
+                    }
+                }
+            }
+            if self.selected >= 0{
+                let mut selected_pos = None;
+                self.kd.for_each(&mut |p| if p.id == self.selected{
+                    selected_pos = Some(p.pos.to_vec2())
+                });
+                if let Some(pos) = selected_pos{
+                    self.kd.for_each(&mut |p| p.pos -= pos-ui.available_size()/2.0);
+                }
             }
             let painter = ui.painter();
             self.kd
