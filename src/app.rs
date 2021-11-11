@@ -82,6 +82,7 @@ impl epi::App for App {
         old_kd.drain(&mut |p| old.push(p));
         let pointer = &ctx.input().pointer;
         if let Some(hover) = pointer.hover_pos() {
+            let old_selected = self.selected;
             if pointer.any_released() {
                 self.selected = -1;
                 old.iter().for_each(&mut |p: &Plannet| {
@@ -91,23 +92,21 @@ impl epi::App for App {
                     }
                 });
             }
-        }
-        if let Some(hover) = pointer.hover_pos() {
             if self.selected < 0 {
                 if let Some(pos) = self.creating {
                     if pointer.any_released() {
                         let mut offset_pos = egui::Vec2::ZERO;
                         let mut offset_vel = egui::Vec2::ZERO;
-                        if self.selected >= 0 {
+                        if old_selected >= 0 {
                             old.iter().for_each(&mut |p: &Plannet| {
-                                if p.id == self.selected {
+                                if p.id == old_selected {
                                     offset_pos = p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
                                     offset_vel = p.vel;
                                 }
                             });
                         }
                         old.push(Plannet::new(
-                            pos - offset_pos,
+                            pos + offset_pos,
                             ((pos - hover) / 10.0) + offset_vel,
                             self.mass,
                             self.size,
@@ -170,30 +169,6 @@ impl epi::App for App {
             if ui.button("reset").clicked() {
                 self.kd = Kd::new(vec![]);
             }
-            if self.force_fields {
-                let size = ctx.available_rect().size();
-                for x in 0..(size.x.ceil() / 10.0) as usize {
-                    for y in 0..(size.y.ceil() / 10.0) as usize {
-                        let pos = egui::Vec2::new(x as f32, y as f32) * 10.0;
-                        let vel = old
-                            .iter()
-                            .map(|d| {
-                                // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                                (d.pos - pos).to_vec2().normalized()
-                                    * dt
-                                    * (grav.powf(2.0) * d.mass)
-                                    / d.pos.distance_sq(pos.to_pos2())
-                            })
-                            .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
-                        let color = (vel.length() * 10000.0 / (self.gravity.powf(2.0))).min(1.0);
-                        ui.painter().arrow(
-                            pos.to_pos2(),
-                            vel.normalized() * 10.0,
-                            egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
-                        );
-                    }
-                }
-            }
             let mut selected_pos = egui::Vec2::ZERO;
             if self.selected >= 0 {
                 self.kd.for_each(&mut |p| {
@@ -201,6 +176,30 @@ impl epi::App for App {
                         selected_pos = p.pos.to_vec2() - ctx.available_rect().size() / 2.0
                     }
                 });
+            }
+            if self.force_fields {
+                let size = ctx.available_rect().size();
+                for x in 0..(size.x.ceil() / 10.0) as usize {
+                    for y in 0..(size.y.ceil() / 10.0) as usize {
+                        let pos = (egui::Vec2::new(x as f32, y as f32) * 10.0) + selected_pos;
+                        let vel = old
+                        .iter()
+                        .map(|d| {
+                            // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                            (d.pos - pos).to_vec2().normalized()
+                            * dt
+                            * (grav.powf(2.0) * d.mass)
+                            / d.pos.distance_sq(pos.to_pos2())
+                        })
+                        .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
+                        let color = (vel.length() * 10000.0 / (self.gravity.powf(2.0))).min(1.0);
+                        ui.painter().arrow(
+                            (pos - selected_pos).to_pos2(),
+                            vel.normalized() * 10.0,
+                            egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
+                        );
+                    }
+                }
             }
             let painter = ui.painter();
             self.kd.for_each(&mut |p| {
