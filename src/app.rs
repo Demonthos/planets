@@ -116,6 +116,12 @@ impl epi::App for App {
 
         // a = g*m/(d^2)
         self.kd = Kd::new(old.clone());
+        self.kd.for_each(&mut |p| {
+            p.trail.push(p.pos);
+            if p.trail.len() > 100{
+                p.trail.remove(0);
+            }
+        });
         self.kd.for_each(&mut |p| p.pos += p.vel);
         let zoom_dt = ctx.input().scroll_delta.y;
         if zoom_dt != 0.0{
@@ -179,7 +185,10 @@ impl epi::App for App {
             }
             let painter = ui.painter();
             self.kd
-                .for_each(&mut |p| painter.circle_filled(p.pos, p.size, egui::Color32::BLUE));
+                .for_each(&mut |p| {
+                    painter.circle_filled(p.pos, p.size, egui::Color32::BLUE);
+                    p.trail.windows(2).for_each(|w| painter.line_segment([w[0], w[1]], egui::Stroke::new(2.0, egui::Color32::BLUE)))
+                });
             if let Some(pos) = self.creating {
                 painter.circle_filled(pos, self.size, egui::Color32::GREEN);
                 if let Some(hover) = pointer.hover_pos() {
