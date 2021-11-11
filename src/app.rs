@@ -83,7 +83,7 @@ impl epi::App for App {
         let pointer = &ctx.input().pointer;
         if let Some(hover) = pointer.interact_pos() {
             let old_selected = self.selected;
-            if pointer.any_released() || ctx.input().any_touches() {
+            if pointer.any_released() {
                 self.selected = -1;
                 old.iter().for_each(&mut |p: &Plannet| {
                     // println!("{:?}", p.pos.distance(i));
@@ -94,13 +94,14 @@ impl epi::App for App {
             }
             if self.selected < 0 {
                 if let Some(pos) = self.creating {
-                    if pointer.any_released() || !ctx.input().any_touches() {
+                    if pointer.any_released() {
                         let mut offset_pos = egui::Vec2::ZERO;
                         let mut offset_vel = egui::Vec2::ZERO;
                         if old_selected >= 0 {
                             old.iter().for_each(&mut |p: &Plannet| {
                                 if p.id == old_selected {
-                                    offset_pos = p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
+                                    offset_pos =
+                                        p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
                                     offset_vel = p.vel;
                                 }
                             });
@@ -183,15 +184,15 @@ impl epi::App for App {
                     for y in 0..(size.y.ceil() / 10.0) as usize {
                         let pos = (egui::Vec2::new(x as f32, y as f32) * 10.0) + selected_pos;
                         let vel = old
-                        .iter()
-                        .map(|d| {
-                            // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                            (d.pos - pos).to_vec2().normalized()
-                            * dt
-                            * (grav.powf(2.0) * d.mass)
-                            / d.pos.distance_sq(pos.to_pos2())
-                        })
-                        .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
+                            .iter()
+                            .map(|d| {
+                                // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                                (d.pos - pos).to_vec2().normalized()
+                                    * dt
+                                    * (grav.powf(2.0) * d.mass)
+                                    / d.pos.distance_sq(pos.to_pos2())
+                            })
+                            .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
                         let color = (vel.length() * 10000.0 / (self.gravity.powf(2.0))).min(1.0);
                         ui.painter().arrow(
                             (pos - selected_pos).to_pos2(),
@@ -214,11 +215,51 @@ impl epi::App for App {
             if let Some(pos) = self.creating {
                 painter.circle_filled(pos, self.size, egui::Color32::GREEN);
                 if let Some(hover) = pointer.interact_pos() {
-                    painter.arrow(
-                        pos,
-                        pos - hover,
-                        egui::Stroke::new(1.0, egui::Color32::GREEN),
-                    );
+                    let vel = pos - hover;
+                    painter.arrow(pos, vel, egui::Stroke::new(1.0, egui::Color32::GREEN));
+                    let mut offset_pos = egui::Vec2::ZERO;
+                    let mut offset_vel = egui::Vec2::ZERO;
+                    if self.selected >= 0 {
+                        old.iter().for_each(&mut |p: &Plannet| {
+                            if p.id == self.selected {
+                                offset_pos =
+                                    p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
+                                offset_vel = p.vel;
+                            }
+                        });
+                    }
+                    old.push(Plannet::new(
+                        pos + offset_pos,
+                        ((pos - hover) / 10.0) + offset_vel,
+                        self.mass,
+                        self.size,
+                        self.last_id,
+                    ));
+                    let mut points = vec![pos + offset_pos];
+                    for _ in 0..100 {
+                        let temp = old.clone();
+                        points.push(
+                            old.last().unwrap().pos
+                        );
+                        old.iter_mut().for_each(|p| {
+                            p.vel += temp
+                                .iter()
+                                .filter(|d| d.id != p.id)
+                                .map(|d| {
+                                    // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                                    (d.pos - p.pos).normalized() * dt * (grav.powf(2.0) * d.mass)
+                                        / d.pos.distance_sq(p.pos)
+                                })
+                                .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
+                        });
+                        old.iter_mut().for_each(|d| d.pos += d.vel)
+                    }
+                    points.windows(2).for_each(|w| {
+                        painter.line_segment(
+                            [w[0] - selected_pos, w[1] - selected_pos],
+                            egui::Stroke::new(2.0, egui::Color32::GREEN),
+                        )
+                    })
                 }
             }
             let com = self.kd.center_of_mass();
