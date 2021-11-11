@@ -181,7 +181,7 @@ impl epi::App for App {
             self.kd
                 .for_each(&mut |p| painter.circle_filled(p.pos, p.size, egui::Color32::BLUE));
             if let Some(pos) = self.creating {
-                painter.circle_filled(pos, 10.0, egui::Color32::GREEN);
+                painter.circle_filled(pos, self.size, egui::Color32::GREEN);
                 if let Some(hover) = pointer.hover_pos() {
                     painter.arrow(
                         pos,
