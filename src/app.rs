@@ -76,12 +76,31 @@ impl epi::App for App {
         old_kd.drain(&mut |p| old.push(p));
         let pointer = &ctx.input().pointer;
         if let Some(hover) = pointer.hover_pos() {
+            if pointer.any_released(){
+                self.selected = -1;
+                old.iter().for_each(&mut |p: &Plannet| {
+                    // println!("{:?}", p.pos.distance(i));
+                    if p.pos.distance(hover) <= p.size{
+                        self.selected = p.id;
+                    }
+                });
+            }
+        }
+        if let Some(hover) = pointer.hover_pos() {
             if self.selected < 0{
                 if let Some(pos) = self.creating {
                     if pointer.any_released() {
+                        let mut offset_pos = egui::Vec2::ZERO;
+                        let mut offset_vel = egui::Vec2::ZERO;
+                        if self.selected >= 0{
+                            old.iter().for_each(&mut |p: &Plannet| if p.id == self.selected{
+                                offset_pos = p.pos.to_vec2();
+                                offset_vel = p.vel;
+                            });
+                        }
                         old.push(Plannet::new(
-                            pos,
-                            (pos - hover) / 10.0,
+                            pos + offset_pos,
+                            ((pos - hover) / 10.0) + offset_vel,
                             self.mass,
                             self.size,
                             self.last_id
@@ -94,15 +113,6 @@ impl epi::App for App {
 
         // a = g*m/(d^2)
         self.kd = Kd::new(old.clone());
-        if let Some(i) = pointer.press_origin(){
-            self.selected = -1;
-            self.kd.for_each(&mut |p| {
-                println!("{:?}", p.pos.distance(i));
-                if p.pos.distance(i) <= p.size{
-                    self.selected = p.id;
-                }
-            });
-        }
         self.kd.for_each(&mut |p| p.pos += p.vel);
         let zoom_dt = ctx.input().scroll_delta.y;
         if zoom_dt != 0.0{
@@ -125,7 +135,9 @@ impl epi::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.selected >= 0{
                 let mut selected_pos = None;
-                self.kd.for_each(&mut |p| if p.id == self.selected{selected_pos = Some(p.pos.to_vec2())});
+                self.kd.for_each(&mut |p| if p.id == self.selected{
+                    selected_pos = Some(p.pos.to_vec2())
+                });
                 if let Some(pos) = selected_pos{
                     self.kd.for_each(&mut |p| p.pos -= pos-ui.available_size()/2.0);
                 }
