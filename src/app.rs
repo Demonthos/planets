@@ -28,7 +28,7 @@ impl Default for App {
     fn default() -> Self {
         Self {
             kd: Kd::new(vec![]),
-            gravity: 1.0,
+            gravity: 20.0,
             size: 5.0,
             mass: 5.0,
             creating: None,
@@ -159,10 +159,11 @@ impl epi::App for App {
                             / d.pos.distance_sq(pos.to_pos2())
                         })
                         .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
+                        let color = (vel.length()*10000.0/(self.gravity*self.gravity)).min(1.0);
                         ui.painter().arrow(
                             pos.to_pos2(),
                             vel.normalized()*10.0,
-                            egui::Stroke::new(1.0, egui::Color32::BLUE),
+                            egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
                         );
                     }
                 }
