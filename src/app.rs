@@ -21,7 +21,9 @@ pub struct App {
     #[cfg_attr(feature = "persistence", serde(skip))]
     selected: i32,
     #[cfg_attr(feature = "persistence", serde(skip))]
-    force_fields: bool
+    force_fields: bool,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    min_trail_update: f32
 }
 
 impl Default for App {
@@ -34,7 +36,8 @@ impl Default for App {
             creating: None,
             last_id: 0,
             selected: -1,
-            force_fields: false
+            force_fields: false,
+            min_trail_update: 0.1
         }
     }
 }
@@ -117,9 +120,16 @@ impl epi::App for App {
         // a = g*m/(d^2)
         self.kd = Kd::new(old.clone());
         self.kd.for_each(&mut |p| {
-            p.trail.push(p.pos);
-            if p.trail.len() > 100{
-                p.trail.remove(0);
+            if if let Some(l) = p.trail.last(){
+                (*l-p.pos).length_sq() > self.min_trail_update.powf(2.0)
+            }
+            else{
+                true   
+            }{
+                p.trail.push(p.pos);
+                if p.trail.len() > 100{
+                    p.trail.remove(0);
+                }
             }
         });
         self.kd.for_each(&mut |p| p.pos += p.vel);
@@ -136,13 +146,13 @@ impl epi::App for App {
                 .filter(|d| d.id != p.id)
                 .map(|d| {
                     // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                    (d.pos - p.pos).normalized() * dt * (grav * grav * d.mass)
+                    (d.pos - p.pos).normalized() * dt * (grav.powf(2.0) * d.mass)
                         / d.pos.distance_sq(p.pos)
                 })
                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
         });
         egui::CentralPanel::default().show(ctx, |ui| {
-            let responces = [ui.add(egui::Slider::new(&mut self.gravity, 0.0..=500.0).text("gravity")), ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")), ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size")), ui.checkbox(&mut self.force_fields, "force arrows")];
+            let responces = [ui.add(egui::Slider::new(&mut self.gravity, 0.0..=500.0).text("gravity")), ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")), ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size")), ui.add(egui::Slider::new(&mut self.min_trail_update, 0.1..=2.0).text("trial length")), ui.checkbox(&mut self.force_fields, "force arrows")];
             if responces.iter().any(|r| r.hovered()){
                 self.creating = None;
             }
@@ -161,11 +171,11 @@ impl epi::App for App {
                         .iter()
                         .map(|d| {
                             // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                            (d.pos - pos).to_vec2().normalized() * dt * (grav * grav * d.mass)
+                            (d.pos - pos).to_vec2().normalized() * dt * (grav.powf(2.0) * d.mass)
                             / d.pos.distance_sq(pos.to_pos2())
                         })
                         .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
-                        let color = (vel.length()*10000.0/(self.gravity*self.gravity)).min(1.0);
+                        let color = (vel.length()*10000.0/(self.gravity.powf(2.0))).min(1.0);
                         ui.painter().arrow(
                             pos.to_pos2(),
                             vel.normalized()*10.0,
