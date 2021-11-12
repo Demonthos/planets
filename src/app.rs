@@ -235,12 +235,13 @@ impl epi::App for App {
                         self.size,
                         self.last_id,
                     ));
-                    let mut points = vec![pos + offset_pos];
+                    let mut points = Vec::new();
                     for _ in 0..300 {
                         let temp = old.clone();
                         points.push(
                             old.last().unwrap().pos
                         );
+                        old.iter_mut().for_each(|d| d.pos += d.vel);
                         old.iter_mut().for_each(|p| {
                             p.vel += temp
                                 .iter()
@@ -252,7 +253,6 @@ impl epi::App for App {
                                 })
                                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
                         });
-                        old.iter_mut().for_each(|d| d.pos += d.vel)
                     }
                     points.windows(2).for_each(|w| {
                         painter.line_segment(
