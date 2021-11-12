@@ -81,13 +81,25 @@ impl epi::App for App {
         let mut old = Vec::new();
         old_kd.drain(&mut |p| old.push(p));
         let pointer = &ctx.input().pointer;
-        if let Some(hover) = pointer.interact_pos() {
-            let old_selected = self.selected;
+        let old_selected = self.selected;
+        if let Some(mouse_pos) = pointer.interact_pos() {
+            let mut offset_pos = egui::Vec2::ZERO;
+            let mut offset_vel = egui::Vec2::ZERO;
+            if self.selected >= 0 {
+                old.iter().for_each(&mut |p: &Plannet| {
+                    if p.id == self.selected {
+                        offset_pos =
+                        p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
+                        offset_vel = p.vel;
+                    }
+                });
+            }
             if pointer.any_released() {
                 self.selected = -1;
                 old.iter().for_each(&mut |p: &Plannet| {
+                    let pos = p.pos-offset_pos;
                     // println!("{:?}", p.pos.distance(i));
-                    if p.pos.distance(hover) <= p.size {
+                    if pos.distance(mouse_pos) <= p.size {
                         self.selected = p.id;
                     }
                 });
@@ -95,25 +107,15 @@ impl epi::App for App {
             if self.selected < 0 {
                 if let Some(pos) = self.creating {
                     if pointer.any_released() {
-                        let mut offset_pos = egui::Vec2::ZERO;
-                        let mut offset_vel = egui::Vec2::ZERO;
-                        if old_selected >= 0 {
-                            old.iter().for_each(&mut |p: &Plannet| {
-                                if p.id == old_selected {
-                                    offset_pos =
-                                        p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
-                                    offset_vel = p.vel;
-                                }
-                            });
-                        }
                         old.push(Plannet::new(
                             pos + offset_pos,
-                            ((pos - hover) / 10.0) + offset_vel,
+                            ((pos - mouse_pos) / 10.0) + offset_vel,
                             self.mass,
                             self.size,
                             self.last_id,
                         ));
                         self.last_id += 1;
+                        self.selected = old_selected;
                     }
                 }
             }
@@ -162,7 +164,8 @@ impl epi::App for App {
                 ),
                 ui.checkbox(&mut self.force_fields, "force arrows"),
             ];
-            if responces.iter().any(|r| r.hovered()) {
+            if responces.iter().any(|r| r.dragged() || r.hovered()) {
+                self.selected = old_selected;
                 self.creating = None;
             } else {
                 self.creating = pointer.press_origin();
@@ -238,8 +241,17 @@ impl epi::App for App {
                     let mut points = Vec::new();
                     for _ in 0..300 {
                         let temp = old.clone();
+                        let mut offset_pos = egui::Vec2::ZERO;
+                        if self.selected >= 0 {
+                            old.iter().for_each(&mut |p: &Plannet| {
+                                if p.id == self.selected {
+                                    offset_pos =
+                                        p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
+                                }
+                            });
+                        }
                         points.push(
-                            old.last().unwrap().pos
+                            old.last().unwrap().pos - offset_pos
                         );
                         old.iter_mut().for_each(|d| d.pos += d.vel);
                         old.iter_mut().for_each(|p| {
@@ -256,14 +268,14 @@ impl epi::App for App {
                     }
                     points.windows(2).for_each(|w| {
                         painter.line_segment(
-                            [w[0] - selected_pos, w[1] - selected_pos],
+                            [w[0], w[1]],
                             egui::Stroke::new(2.0, egui::Color32::GREEN),
                         )
                     })
                 }
             }
-            let com = self.kd.center_of_mass();
-            painter.circle_filled(com.1, com.0, egui::Color32::RED);
+            // let com = self.kd.center_of_mass();
+            // painter.circle_filled(com.1, com.0, egui::Color32::RED);
             egui::warn_if_debug_build(ui);
         });
     }

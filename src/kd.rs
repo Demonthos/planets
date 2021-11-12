@@ -1,3 +1,5 @@
+// todo: render only things in frame and clump far away systems into their center of mass
+
 use crate::plannet::Plannet;
 use eframe::egui;
 
