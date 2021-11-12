@@ -163,7 +163,7 @@ impl epi::App for App {
                 ui.checkbox(&mut self.force_fields, "force arrows"),
             ];
             if self.force_fields{
-                responces.push(ui.add(egui::Slider::new(&mut self.arrow_size, 1.0..=60.0).text("arrow size")))
+                responces.push(ui.add(egui::Slider::new(&mut self.arrow_size, 3.0..=60.0).text("arrow size")))
             }
             if responces.iter().any(|r| r.dragged() || r.hovered()) {
                 self.selected = old_selected;
@@ -182,10 +182,11 @@ impl epi::App for App {
                     }
                 });
             }
+            let painter = ui.painter();
             if self.force_fields {
                 let size = ctx.available_rect().size();
                 let mut key_points = Vec::new();
-                let key_points_dist = 2.0;
+                let key_points_dist = 3.0;
                 for x in 0..((size.x / self.arrow_size)/key_points_dist).ceil() as usize + 1{
                     for y in 0..((size.y / self.arrow_size)/key_points_dist).ceil() as usize + 1{
                         let pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size * key_points_dist) + selected_pos;
@@ -212,9 +213,10 @@ impl epi::App for App {
                     }
                 }
 
+                let mut arrows = Vec::new();
                 for x in 0..(size.x.ceil() / self.arrow_size) as usize {
                     for y in 0..(size.y.ceil() / self.arrow_size) as usize {
-                        let pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size) + selected_pos;
+                        let mut pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size) + selected_pos;
                         let left = (x as f32/key_points_dist).floor() as usize;
                         let right = (x as f32/key_points_dist).ceil() as usize;
                         let x_frac = (x as f32/key_points_dist).fract().powf(2.0);
@@ -239,23 +241,23 @@ impl epi::App for App {
                                 y_frac*(key_points[right][bottom].0*x_frac + key_points[left][bottom].0*(1.0-x_frac)) + (1.0-y_frac)*(key_points[right][top].0*x_frac + key_points[left][top].0*(1.0-x_frac))
                             };
                             let color = y_frac*(key_points[right][bottom].1*x_frac + key_points[left][bottom].1*(1.0-x_frac)) + (1.0-y_frac)*(key_points[right][top].1*x_frac + key_points[left][top].1*(1.0-x_frac));
-                            ui.painter().arrow(
-                                (pos - selected_pos).to_pos2(),
-                                vel.normalized() * self.arrow_size,
-                                egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
-                            );
+                            pos -= selected_pos;
+                            arrows.push(egui::Shape::LineSegment{
+                                points: [pos.to_pos2(), (pos + vel.normalized() * self.arrow_size).to_pos2()],
+                                stroke: egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
+                            });
                         }
                         else{
-                            ui.painter().arrow(
-                                (pos - selected_pos).to_pos2(),
-                                key_points[right][bottom].0.normalized() * self.arrow_size,
-                                egui::Stroke::new(1.0, egui::color::Hsva::new(key_points[right][bottom].1, 1.0, 1.0, key_points[right][bottom].1)),
-                            );
+                            pos -= selected_pos;
+                            arrows.push(egui::Shape::LineSegment{
+                                points: [pos.to_pos2(), (pos + key_points[right][bottom].0.normalized() * self.arrow_size).to_pos2()],
+                                stroke: egui::Stroke::new(1.0, egui::color::Hsva::new(key_points[right][bottom].1, 1.0, 1.0, key_points[right][bottom].1)),
+                            });
                         }
                     }
                 }
+                painter.extend(arrows);
             }
-            let painter = ui.painter();
             self.particles.iter_mut().for_each(|p| {
                 painter.circle_filled(p.pos - selected_pos, p.size, egui::Color32::BLUE);
                 p.trail.windows(2).for_each(|w| {
