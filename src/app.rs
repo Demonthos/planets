@@ -24,6 +24,10 @@ pub struct App {
     force_fields: bool,
     #[cfg_attr(feature = "persistence", serde(skip))]
     min_trail_update: f32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    arrow_size: f32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    subdivisions: i8
 }
 
 impl Default for App {
@@ -38,6 +42,8 @@ impl Default for App {
             selected: -1,
             force_fields: false,
             min_trail_update: 0.1,
+            arrow_size: 10.0,
+            subdivisions: 2,
         }
     }
 }
@@ -155,7 +161,7 @@ impl epi::App for App {
                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
         });
         egui::CentralPanel::default().show(ctx, |ui| {
-            let responces = [
+            let mut responces = vec![
                 ui.add(egui::Slider::new(&mut self.gravity, 0.0..=500.0).text("gravity")),
                 ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")),
                 ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size")),
@@ -164,6 +170,10 @@ impl epi::App for App {
                 ),
                 ui.checkbox(&mut self.force_fields, "force arrows"),
             ];
+            if self.force_fields{
+                responces.push(ui.add(egui::Slider::new(&mut self.arrow_size, 2.0..=60.0).text("arrow size")));
+                responces.push(ui.add(egui::Slider::new(&mut self.subdivisions, 1..=60).text("subdivisions")));
+            }
             if responces.iter().any(|r| r.dragged() || r.hovered()) {
                 self.selected = old_selected;
                 self.creating = None;
@@ -183,23 +193,14 @@ impl epi::App for App {
             }
             if self.force_fields {
                 let size = ctx.available_rect().size();
-                for x in 0..(size.x.ceil() / 10.0) as usize {
-                    for y in 0..(size.y.ceil() / 10.0) as usize {
-                        let pos = (egui::Vec2::new(x as f32, y as f32) * 10.0) + selected_pos;
-                        let vel = old
-                            .iter()
-                            .map(|d| {
-                                // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                                (d.pos - pos).to_vec2().normalized()
-                                    * dt
-                                    * (grav.powf(2.0) * d.mass)
-                                    / d.pos.distance_sq(pos.to_pos2())
-                            })
-                            .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
+                for x in 0..(size.x.ceil() / self.arrow_size) as usize {
+                    for y in 0..(size.y.ceil() / self.arrow_size) as usize {
+                        let pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size) + selected_pos;
+                        let vel = self.kd.approximate_force(pos.to_pos2(), 2) * dt * grav.powf(2.0);
                         let color = (vel.length() * 10000.0 / (self.gravity.powf(2.0))).min(1.0);
                         ui.painter().arrow(
                             (pos - selected_pos).to_pos2(),
-                            vel.normalized() * 10.0,
+                            vel.normalized() * self.arrow_size,
                             egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
                         );
                     }
@@ -240,7 +241,7 @@ impl epi::App for App {
                     ));
                     let mut points = Vec::new();
                     for _ in 0..300 {
-                        let temp = old.clone();
+                        let temp = Kd::new(old.clone());
                         let mut offset_pos = egui::Vec2::ZERO;
                         if self.selected >= 0 {
                             old.iter().for_each(&mut |p: &Plannet| {
@@ -255,15 +256,7 @@ impl epi::App for App {
                         );
                         old.iter_mut().for_each(|d| d.pos += d.vel);
                         old.iter_mut().for_each(|p| {
-                            p.vel += temp
-                                .iter()
-                                .filter(|d| d.id != p.id)
-                                .map(|d| {
-                                    // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                                    (d.pos - p.pos).normalized() * dt * (grav.powf(2.0) * d.mass)
-                                        / d.pos.distance_sq(p.pos)
-                                })
-                                .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
+                            p.vel += temp.approximate_force(p.pos, 2) * dt * grav.powf(2.0);
                         });
                     }
                     points.windows(2).for_each(|w| {

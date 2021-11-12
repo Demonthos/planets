@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eu
 
-# ./setup_web.sh # <- call this first!
+./setup_web.sh # <- call this first!
 
 FOLDER_NAME=${PWD##*/}
 CRATE_NAME=$FOLDER_NAME # assume crate name is the same as the folder name
@@ -11,6 +11,7 @@ CRATE_NAME_SNAKE_CASE="${CRATE_NAME//-/_}" # for those who name crates with-keba
 # https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.Clipboard.html
 # https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html
 export RUSTFLAGS=--cfg=web_sys_unstable_apis
+export CARGO_INCREMENTAL=0
 
 # Clear output from old stuff:
 rm -f docs/${CRATE_NAME_SNAKE_CASE}_bg.wasm
@@ -21,8 +22,7 @@ cargo build --release -p ${CRATE_NAME} --lib --target wasm32-unknown-unknown
 
 echo "Generating JS bindings for wasm…"
 TARGET_NAME="${CRATE_NAME_SNAKE_CASE}.wasm"
-wasm-bindgen "target/wasm32-unknown-unknown/${BUILD}/${TARGET_NAME}" \
-  --out-dir docs --no-modules --no-typescript
+wasm-bindgen "target/wasm32-unknown-unknown/${BUILD}/${TARGET_NAME}" --out-dir docs --no-modules --no-typescript
 
 # to get wasm-opt:  apt/brew/dnf install binaryen
 # echo "Optimizing wasm…"
