@@ -300,7 +300,7 @@ impl epi::App for App {
                         self.size,
                         self.last_id,
                     ));
-                    let mut points = Vec::new();
+                    let mut last_points: Option<Vec<_>> = None;
                     for _ in 0..300 {
                         let temp = old.clone();
                         let mut offset_pos = egui::Vec2::ZERO;
@@ -312,9 +312,16 @@ impl epi::App for App {
                                 }
                             });
                         }
-                        points.push(
-                            old.last().unwrap().pos - offset_pos
-                        );
+                        let new_points: Vec<_> = old.iter().map(|e| e.pos - offset_pos).collect();
+                        if let Some(ops) = last_points{
+                            for ps in ops.iter().zip(new_points.iter()){
+                                painter.line_segment(
+                                    [*ps.0, *ps.1],
+                                    egui::Stroke::new(2.0, egui::Color32::GREEN),
+                                )
+                            }
+                        }
+                        last_points = Some(new_points);
                         old.iter_mut().for_each(|d| d.pos += d.vel);
                         old.iter_mut().for_each(|p| {
                             p.vel += temp
@@ -328,12 +335,6 @@ impl epi::App for App {
                                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
                         });
                     }
-                    points.windows(2).for_each(|w| {
-                        painter.line_segment(
-                            [w[0], w[1]],
-                            egui::Stroke::new(2.0, egui::Color32::GREEN),
-                        )
-                    })
                 }
             }
             // let com = self.particles.center_of_mass();
