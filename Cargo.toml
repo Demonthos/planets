@@ -21,6 +21,14 @@ persistence = ["eframe/persistence", "serde"]
 [profile.release]
 opt-level = 2 # fast and small wasm
 
+# building is optimized, but slow
+# [profile.release]
+# lto = true
+# codegen-units = 1
+# opt-level = 3
+# debug = true
+
+
 [patch.crates-io]
 
 # If you want to use the bleeding edge version of `egui`:
