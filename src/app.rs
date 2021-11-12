@@ -236,7 +236,7 @@ impl epi::App for App {
                         self.last_id,
                     ));
                     let mut points = vec![pos + offset_pos];
-                    for _ in 0..100 {
+                    for _ in 0..300 {
                         let temp = old.clone();
                         points.push(
                             old.last().unwrap().pos
