@@ -109,9 +109,20 @@ impl epi::App for App {
             if self.selected < 0 {
                 if let Some(pos) = self.creating {
                     if pointer.any_released() {
+                        let vel = if ctx.input().modifiers.shift{
+                            if let Some(nearest) = self.particles.iter().max_by(|e1, e2| (e1.mass/e1.pos.distance_sq(mouse_pos)).partial_cmp(&(e2.mass/e2.pos.distance_sq(mouse_pos))).unwrap()){
+                                (nearest.pos - pos).normalized().rot90()*pos.distance(mouse_pos)
+                            }
+                            else{
+                                pos - mouse_pos
+                            }
+                        }
+                        else{
+                            pos - mouse_pos
+                        };
                         self.particles.push(Plannet::new(
                             pos + offset_pos,
-                            ((pos - mouse_pos) / 10.0) + offset_vel,
+                            ((vel) / 10.0) + offset_vel,
                             self.mass,
                             self.size,
                             self.last_id,
@@ -128,6 +139,7 @@ impl epi::App for App {
         let zoom_dt = ctx.input().scroll_delta.y;
         if zoom_dt != 0.0 {
             self.mass += zoom_dt / 20.0;
+            self.mass = self.mass.max(1.0);
         }
 
         if ctx.input().key_pressed(egui::Key::Space){
@@ -289,8 +301,18 @@ impl epi::App for App {
             });
             if let Some(pos) = self.creating {
                 painter.circle_filled(pos, self.size, egui::Color32::GREEN);
-                if let Some(hover) = pointer.interact_pos() {
-                    let vel = pos - hover;
+                if let Some(mouse_pos) = pointer.interact_pos() {
+                    let vel = if ctx.input().modifiers.shift{
+                        if let Some(nearest) = self.particles.iter().max_by(|e1, e2| (e1.mass/e1.pos.distance_sq(mouse_pos)).partial_cmp(&(e2.mass/e2.pos.distance_sq(mouse_pos))).unwrap()){
+                            (nearest.pos - pos).normalized().rot90()*pos.distance(mouse_pos)
+                        }
+                        else{
+                            pos - mouse_pos
+                        }
+                    }
+                    else{
+                        pos - mouse_pos
+                    };
                     painter.arrow(pos, vel, egui::Stroke::new(1.0, egui::Color32::GREEN));
                     let mut offset_pos = egui::Vec2::ZERO;
                     let mut offset_vel = egui::Vec2::ZERO;
@@ -305,7 +327,7 @@ impl epi::App for App {
                     }
                     old.push(Plannet::new(
                         pos + offset_pos,
-                        ((pos - hover) / 10.0) + offset_vel,
+                        ((pos - mouse_pos) / 10.0) + offset_vel,
                         self.mass,
                         self.size,
                         self.last_id,
