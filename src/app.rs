@@ -185,7 +185,7 @@ impl epi::App for App {
             if self.force_fields {
                 let size = ctx.available_rect().size();
                 let mut key_points = Vec::new();
-                let key_points_dist = 3.0;
+                let key_points_dist = 2.0;
                 for x in 0..((size.x / self.arrow_size)/key_points_dist).ceil() as usize + 1{
                     for y in 0..((size.y / self.arrow_size)/key_points_dist).ceil() as usize + 1{
                         let pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size * key_points_dist) + selected_pos;
@@ -208,7 +208,7 @@ impl epi::App for App {
                         if y == 0{
                             key_points.push(Vec::new());
                         }
-                        key_points.last_mut().unwrap().push((vel, color, min_dist_sq < 1000.0))
+                        key_points.last_mut().unwrap().push((vel, color, if min_dist_sq < 1000.0{2}else if color < 0.1{1}else{0}))
                     }
                 }
 
@@ -217,32 +217,41 @@ impl epi::App for App {
                         let pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size) + selected_pos;
                         let left = (x as f32/key_points_dist).floor() as usize;
                         let right = (x as f32/key_points_dist).ceil() as usize;
-                        let x_frac = (x as f32/key_points_dist).fract();
+                        let x_frac = (x as f32/key_points_dist).fract().powf(2.0);
                         let top = (y as f32/key_points_dist).floor() as usize;
                         let bottom = (y as f32/key_points_dist).ceil() as usize;
-                        let y_frac = (y as f32/key_points_dist).fract();
+                        let y_frac = (y as f32/key_points_dist).fract().powf(2.0);
                         let any_close = [key_points[left][bottom], key_points[right][bottom], key_points[left][top], key_points[right][top]].iter().map(|e| e.2).max().unwrap();
-                        let vel = if any_close{
-                            old
-                            .iter()
-                            .map(|d| {
-                                // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                                (d.pos - pos).to_vec2().normalized()
-                                * dt
-                                * (grav.powf(2.0) * d.mass)
-                                / d.pos.distance_sq(pos.to_pos2())
-                            })
-                            .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
+                        if any_close != 1{
+                            let vel = if any_close == 2{
+                                old
+                                .iter()
+                                .map(|d| {
+                                    // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                                    (d.pos - pos).to_vec2().normalized()
+                                    * dt
+                                    * (grav.powf(2.0) * d.mass)
+                                    / d.pos.distance_sq(pos.to_pos2())
+                                })
+                                .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
+                            }
+                            else{
+                                y_frac*(key_points[right][bottom].0*x_frac + key_points[left][bottom].0*(1.0-x_frac)) + (1.0-y_frac)*(key_points[right][top].0*x_frac + key_points[left][top].0*(1.0-x_frac))
+                            };
+                            let color = y_frac*(key_points[right][bottom].1*x_frac + key_points[left][bottom].1*(1.0-x_frac)) + (1.0-y_frac)*(key_points[right][top].1*x_frac + key_points[left][top].1*(1.0-x_frac));
+                            ui.painter().arrow(
+                                (pos - selected_pos).to_pos2(),
+                                vel.normalized() * self.arrow_size,
+                                egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
+                            );
                         }
                         else{
-                            y_frac*(key_points[right][bottom].0*x_frac + key_points[left][bottom].0*(1.0-x_frac)) + (1.0-y_frac)*(key_points[right][top].0*x_frac + key_points[left][top].0*(1.0-x_frac))
-                        };
-                        let color = y_frac*(key_points[right][bottom].1*x_frac + key_points[left][bottom].1*(1.0-x_frac)) + (1.0-y_frac)*(key_points[right][top].1*x_frac + key_points[left][top].1*(1.0-x_frac));
-                        ui.painter().arrow(
-                            (pos - selected_pos).to_pos2(),
-                            vel.normalized() * self.arrow_size,
-                            egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
-                        );
+                            ui.painter().arrow(
+                                (pos - selected_pos).to_pos2(),
+                                key_points[right][bottom].0.normalized() * self.arrow_size,
+                                egui::Stroke::new(1.0, egui::color::Hsva::new(key_points[right][bottom].1, 1.0, 1.0, key_points[right][bottom].1)),
+                            );
+                        }
                     }
                 }
             }
