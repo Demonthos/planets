@@ -24,6 +24,8 @@ pub struct App {
     force_fields: bool,
     #[cfg_attr(feature = "persistence", serde(skip))]
     min_trail_update: f32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    arrow_size: f32
 }
 
 impl Default for App {
@@ -38,6 +40,7 @@ impl Default for App {
             selected: -1,
             force_fields: false,
             min_trail_update: 0.1,
+            arrow_size: 10.0,
         }
     }
 }
@@ -155,7 +158,7 @@ impl epi::App for App {
                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
         });
         egui::CentralPanel::default().show(ctx, |ui| {
-            let responces = [
+            let mut responces = vec![
                 ui.add(egui::Slider::new(&mut self.gravity, 0.0..=500.0).text("gravity")),
                 ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")),
                 ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size")),
@@ -164,6 +167,9 @@ impl epi::App for App {
                 ),
                 ui.checkbox(&mut self.force_fields, "force arrows"),
             ];
+            if self.force_fields{
+                responces.push(ui.add(egui::Slider::new(&mut self.arrow_size, 1.0..=60.0).text("arrow size")))
+            }
             if responces.iter().any(|r| r.dragged() || r.hovered()) {
                 self.selected = old_selected;
                 self.creating = None;
@@ -183,9 +189,9 @@ impl epi::App for App {
             }
             if self.force_fields {
                 let size = ctx.available_rect().size();
-                for x in 0..(size.x.ceil() / 10.0) as usize {
-                    for y in 0..(size.y.ceil() / 10.0) as usize {
-                        let pos = (egui::Vec2::new(x as f32, y as f32) * 10.0) + selected_pos;
+                for x in 0..(size.x.ceil() / self.arrow_size) as usize {
+                    for y in 0..(size.y.ceil() / self.arrow_size) as usize {
+                        let pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size) + selected_pos;
                         let vel = old
                             .iter()
                             .map(|d| {
@@ -199,7 +205,7 @@ impl epi::App for App {
                         let color = (vel.length() * 10000.0 / (self.gravity.powf(2.0))).min(1.0);
                         ui.painter().arrow(
                             (pos - selected_pos).to_pos2(),
-                            vel.normalized() * 10.0,
+                            vel.normalized() * self.arrow_size,
                             egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
                         );
                     }
