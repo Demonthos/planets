@@ -9,10 +9,11 @@ pub struct Plannet {
     pub size: f32,
     pub id: i32,
     pub trail: Vec<egui::Pos2>,
+    pub color: egui::Color32
 }
 
 impl Plannet {
-    pub fn new(pos: egui::Pos2, vel: egui::Vec2, mass: f32, size: f32, id: i32) -> Plannet {
+    pub fn new(pos: egui::Pos2, vel: egui::Vec2, mass: f32, size: f32, id: i32, color: impl Into<egui::Color32>) -> Plannet {
         Plannet {
             pos,
             vel,
@@ -20,6 +21,7 @@ impl Plannet {
             size,
             id,
             trail: Vec::new(),
+            color: color.into()
         }
     }
 }

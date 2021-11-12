@@ -1,3 +1,4 @@
+use rand::prelude::*;
 use crate::plannet::Plannet;
 use eframe::{egui, epi};
 
@@ -24,6 +25,8 @@ pub struct App {
     min_trail_update: f32,
     #[cfg_attr(feature = "persistence", serde(skip))]
     arrow_size: f32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    paused: bool,
 }
 
 impl Default for App {
@@ -39,6 +42,7 @@ impl Default for App {
             force_fields: false,
             min_trail_update: 0.1,
             arrow_size: 10.0,
+            paused: false,
         }
     }
 }
@@ -111,6 +115,7 @@ impl epi::App for App {
                             self.mass,
                             self.size,
                             self.last_id,
+                            egui::color::Hsva::new(rand::random::<f32>(), 1.0, rand::random::<f32>(), 1.0)
                         ));
                         self.last_id += 1;
                         self.selected = old_selected;
@@ -120,38 +125,43 @@ impl epi::App for App {
         }
 
         // a = g*m/(d^2)
-        let mut old = self.particles.clone();
-        self.particles.iter_mut().for_each(|p| {
-            if if let Some(l) = p.trail.last() {
-                (*l - p.pos).length_sq() > self.min_trail_update.powf(2.0)
-            } else {
-                true
-            } {
-                p.trail.push(p.pos);
-                if p.trail.len() > 100 {
-                    p.trail.remove(0);
-                }
-            }
-        });
-        self.particles.iter_mut().for_each(|p| p.pos += p.vel);
         let zoom_dt = ctx.input().scroll_delta.y;
         if zoom_dt != 0.0 {
-            self.gravity *= zoom_dt / 50.0;
+            self.mass += zoom_dt / 20.0;
         }
 
-        let grav = self.gravity;
+        if ctx.input().key_pressed(egui::Key::Space){
+            self.paused = !self.paused;
+        }
 
-        self.particles.iter_mut().for_each(|p| {
-            p.vel += old
+        let mut old = self.particles.clone();
+        if !self.paused{
+            self.particles.iter_mut().for_each(|p| {
+                if if let Some(l) = p.trail.last() {
+                    (*l - p.pos).length_sq() > self.min_trail_update.powf(2.0)
+                } else {
+                    true
+                } {
+                    p.trail.push(p.pos);
+                    if p.trail.len() > 100 {
+                        p.trail.remove(0);
+                    }
+                }
+            });
+            self.particles.iter_mut().for_each(|p| p.pos += p.vel);
+
+            self.particles.iter_mut().for_each(|p| {
+                p.vel += old
                 .iter()
                 .filter(|d| d.id != p.id)
                 .map(|d| {
-                    // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                    (d.pos - p.pos).normalized() * dt * (grav.powf(2.0) * d.mass)
-                        / d.pos.distance_sq(p.pos)
+                    // (d.pos - p.pos).normalized() * dt * (self.gravity * p.mass * d.mass)
+                    (d.pos - p.pos).normalized() * dt * (self.gravity.powf(2.0) * d.mass)
+                    / d.pos.distance_sq(p.pos)
                 })
                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
-        });
+            });
+        }
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut responces = vec![
                 ui.add(egui::Slider::new(&mut self.gravity, 0.0..=500.0).text("gravity")),
@@ -194,14 +204,14 @@ impl epi::App for App {
                         let vel = old
                             .iter()
                             .map(|d| {
-                                // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                                // (d.pos - p.pos).normalized() * dt * (self.gravity * p.mass * d.mass)
                                 let dist_sq = d.pos.distance_sq(pos.to_pos2());
                                 if dist_sq < min_dist_sq{
                                     min_dist_sq = dist_sq
                                 }
                                 (d.pos - pos).to_vec2().normalized()
                                     * dt
-                                    * (grav.powf(2.0) * d.mass)
+                                    * (self.gravity.powf(2.0) * d.mass)
                                     / dist_sq
                             })
                             .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
@@ -209,7 +219,7 @@ impl epi::App for App {
                         if y == 0{
                             key_points.push(Vec::new());
                         }
-                        key_points.last_mut().unwrap().push((vel, color, if min_dist_sq < 1000.0{2}else if color < 0.1{1}else{0}))
+                        key_points.last_mut().unwrap().push((vel, color, if min_dist_sq < 1000.0 {2} else if color < 0.1 {1} else {0}))
                     }
                 }
 
@@ -229,10 +239,10 @@ impl epi::App for App {
                                 old
                                 .iter()
                                 .map(|d| {
-                                    // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
+                                    // (d.pos - p.pos).normalized() * dt * (self.gravity * p.mass * d.mass)
                                     (d.pos - pos).to_vec2().normalized()
                                     * dt
-                                    * (grav.powf(2.0) * d.mass)
+                                    * (self.gravity.powf(2.0) * d.mass)
                                     / d.pos.distance_sq(pos.to_pos2())
                                 })
                                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
@@ -269,11 +279,11 @@ impl epi::App for App {
                 painter.extend(arrows);
             }
             self.particles.iter_mut().for_each(|p| {
-                painter.circle_filled(p.pos - selected_pos, p.size, egui::Color32::BLUE);
+                painter.circle_filled(p.pos - selected_pos, p.size, p.color);
                 p.trail.windows(2).for_each(|w| {
                     painter.line_segment(
                         [w[0] - selected_pos, w[1] - selected_pos],
-                        egui::Stroke::new(2.0, egui::Color32::BLUE),
+                        egui::Stroke::new(2.0, p.color),
                     )
                 })
             });
@@ -299,6 +309,7 @@ impl epi::App for App {
                         self.mass,
                         self.size,
                         self.last_id,
+                        egui::Color32::GREEN
                     ));
                     let mut last_points: Option<Vec<_>> = None;
                     for _ in 0..300 {
@@ -312,24 +323,29 @@ impl epi::App for App {
                                 }
                             });
                         }
-                        let new_points: Vec<_> = old.iter().map(|e| e.pos - offset_pos).collect();
+                        let new_points = old.iter().map(|e| (e.pos - offset_pos, e.color));
                         if let Some(ops) = last_points{
-                            for ps in ops.iter().zip(new_points.iter()){
+                            for (i, ps) in ops.iter().zip(new_points.clone()).enumerate(){
+                                let (pos, color) = ps.1;
+                                let mut color: egui::color::Hsva = color.into();
+                                if i != temp.len() - 1{
+                                    color.s /= 2.0;
+                                }
                                 painter.line_segment(
-                                    [*ps.0, *ps.1],
-                                    egui::Stroke::new(2.0, egui::Color32::GREEN),
+                                    [*ps.0, pos],
+                                    egui::Stroke::new(2.0, color),
                                 )
                             }
                         }
-                        last_points = Some(new_points);
+                        last_points = Some(new_points.map(|e|e.0).collect());
                         old.iter_mut().for_each(|d| d.pos += d.vel);
                         old.iter_mut().for_each(|p| {
                             p.vel += temp
                                 .iter()
                                 .filter(|d| d.id != p.id)
                                 .map(|d| {
-                                    // (d.pos - p.pos).normalized() * dt * (grav * p.mass * d.mass)
-                                    (d.pos - p.pos).normalized() * dt * (grav.powf(2.0) * d.mass)
+                                    // (d.pos - p.pos).normalized() * dt * (self.gravity * p.mass * d.mass)
+                                    (d.pos - p.pos).normalized() * dt * (self.gravity.powf(2.0) * d.mass)
                                         / d.pos.distance_sq(p.pos)
                                 })
                                 .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
