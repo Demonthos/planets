@@ -3,7 +3,6 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 mod app;
-mod kd;
 mod plannet;
 pub use app::App;
 
