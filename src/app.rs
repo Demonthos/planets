@@ -204,7 +204,7 @@ impl epi::App for App {
                     }
                 });
             }
-            let painter = ui.painter();
+            let (_, painter) = ui.allocate_painter(ctx.input().screen_rect.size(), egui::Sense::focusable_noninteractive());
             if self.force_fields {
                 let size = ctx.available_rect().size();
                 let mut key_points = Vec::new();
