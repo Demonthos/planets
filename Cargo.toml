@@ -21,15 +21,15 @@ rand = "0.8.4"
 default = []
 persistence = ["eframe/persistence", "serde"]
 
-# [profile.release]
-# opt-level = 2 # fast and small wasm
+[profile.release]
+opt-level = 2 # fast and small wasm
 
 # building is optimized, but slow
-[profile.release]
-lto = true
-codegen-units = 1
-opt-level = 3
-debug = true
+# [profile.release]
+# lto = true
+# codegen-units = 1
+# opt-level = 3
+# debug = true
 
 
 [patch.crates-io]
