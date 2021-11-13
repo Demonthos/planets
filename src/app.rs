@@ -122,7 +122,7 @@ impl epi::App for App {
                         };
                         self.particles.push(Plannet::new(
                             pos + offset_pos,
-                            ((vel) / 10.0) + offset_vel,
+                            (vel / 10.0) + offset_vel,
                             self.mass,
                             self.size,
                             self.last_id,
@@ -327,7 +327,7 @@ impl epi::App for App {
                     }
                     old.push(Plannet::new(
                         pos + offset_pos,
-                        ((pos - mouse_pos) / 10.0) + offset_vel,
+                        (vel / 10.0) + offset_vel,
                         self.mass,
                         self.size,
                         self.last_id,
