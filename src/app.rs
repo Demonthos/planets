@@ -235,9 +235,17 @@ impl epi::App for App {
                     }
                 }
 
-                let mut arrows = Vec::new();
-                for x in 0..(size.x.ceil() / self.arrow_size) as usize {
-                    for y in 0..(size.y.ceil() / self.arrow_size) as usize {
+                let x_size = (size.x.ceil() / self.arrow_size) as usize;
+                let y_size = (size.y.ceil() / self.arrow_size) as usize;
+                let mut arrows = if self.arrow_size > 5.0{
+                    Vec::new()
+                }
+                else{
+                    Vec::with_capacity(x_size*y_size)
+                };
+                let mut idx = 0;
+                for x in 0..x_size {
+                    for y in 0..y_size {
                         let mut pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size) + selected_pos;
                         let left = (x as f32/key_points_dist).floor() as usize;
                         let right = (x as f32/key_points_dist).ceil() as usize;
@@ -264,26 +272,28 @@ impl epi::App for App {
                             };
                             let color = y_frac*(key_points[right][bottom].1*x_frac + key_points[left][bottom].1*(1.0-x_frac)) + (1.0-y_frac)*(key_points[right][top].1*x_frac + key_points[left][top].1*(1.0-x_frac));
                             pos -= selected_pos;
-                            if self.arrow_size > 5.0{
+                            if arrows.is_empty(){
                                 painter.arrow(pos.to_pos2(), vel.normalized() * self.arrow_size, egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)));
                             }
                             else{
-                                arrows.push(egui::Shape::LineSegment{
+                                arrows[idx] = egui::Shape::LineSegment{
                                     points: [pos.to_pos2(), (pos + vel.normalized() * self.arrow_size).to_pos2()],
                                     stroke: egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
-                                });
+                                };
+                                idx += 1;
                             }
                         }
                         else{
                             pos -= selected_pos;
-                            if self.arrow_size > 5.0{
+                            if arrows.is_empty(){
                                 painter.arrow(pos.to_pos2(), key_points[right][bottom].0.normalized() * self.arrow_size, egui::Stroke::new(1.0, egui::color::Hsva::new(key_points[right][bottom].1, 1.0, 1.0, key_points[right][bottom].1)));
                             }
                             else{
-                                arrows.push(egui::Shape::LineSegment{
+                                arrows[idx] = egui::Shape::LineSegment{
                                     points: [pos.to_pos2(), (pos + key_points[right][bottom].0.normalized() * self.arrow_size).to_pos2()],
                                     stroke: egui::Stroke::new(1.0, egui::color::Hsva::new(key_points[right][bottom].1, 1.0, 1.0, key_points[right][bottom].1)),
-                                });
+                                };
+                                idx += 1;
                             }
                         }
                     }
