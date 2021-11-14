@@ -211,7 +211,7 @@ impl epi::App for App {
                         if y == 0{
                             key_points.push(Vec::new());
                         }
-                        key_points.last_mut().unwrap().push((vel, color, if min_dist_sq < 1000.0 {2} else if color < 0.1 {1} else {0}))
+                        key_points.last_mut().unwrap().push((vel, color, if min_dist_sq < 1000.0 {2} else if color < 0.1 {0} else {1}))
                     }
                 }
 
@@ -233,9 +233,9 @@ impl epi::App for App {
                         let top = (y as f32/key_points_dist).floor() as usize;
                         let bottom = (y as f32/key_points_dist).ceil() as usize;
                         let y_frac = (y as f32/key_points_dist).fract();
-                        let all_close = [key_points[left][bottom], key_points[right][bottom], key_points[left][top], key_points[right][top]].iter().map(|e| e.2).min().unwrap();
-                        if all_close != 1{
-                            let vel = if all_close == 2{
+                        let highest_rending_level = [key_points[left][bottom], key_points[right][bottom], key_points[left][top], key_points[right][top]].iter().map(|e| e.2).max().unwrap();
+                        if highest_rending_level != 1{
+                            let vel = if highest_rending_level == 2{
                                 old
                                 .iter()
                                 .map(|d| {
