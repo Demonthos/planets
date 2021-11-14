@@ -1,12 +1,12 @@
 use rand::prelude::*;
-use crate::plannet::Plannet;
+use crate::planet::Planet;
 use eframe::{egui, epi};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 pub struct App {
-    particles: Vec<Plannet>,
+    particles: Vec<Planet>,
     #[cfg_attr(feature = "persistence", serde(skip))]
     gravity: f32,
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -26,6 +26,8 @@ pub struct App {
     #[cfg_attr(feature = "persistence", serde(skip))]
     arrow_size: f32,
     #[cfg_attr(feature = "persistence", serde(skip))]
+    preview_length: i32,
+    #[cfg_attr(feature = "persistence", serde(skip))]
     paused: bool,
 }
 
@@ -42,6 +44,7 @@ impl Default for App {
             force_fields: false,
             min_trail_update: 0.1,
             arrow_size: 10.0,
+            preview_length: 100,
             paused: false,
         }
     }
@@ -49,7 +52,7 @@ impl Default for App {
 
 impl epi::App for App {
     fn name(&self) -> &str {
-        "Plannets!"
+        "Planets!"
     }
 
     /// Called once before the first frame.
@@ -88,7 +91,7 @@ impl epi::App for App {
             let mut offset_pos = egui::Vec2::ZERO;
             let mut offset_vel = egui::Vec2::ZERO;
             if self.selected >= 0 {
-                self.particles.iter().for_each(&mut |p: &Plannet| {
+                self.particles.iter().for_each(&mut |p: &Planet| {
                     if p.id == self.selected {
                         offset_pos =
                         p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
@@ -98,7 +101,7 @@ impl epi::App for App {
             }
             if pointer.any_released() {
                 self.selected = -1;
-                self.particles.iter().for_each(&mut |p: &Plannet| {
+                self.particles.iter().for_each(&mut |p: &Planet| {
                     let pos = p.pos-offset_pos;
                     // println!("{:?}", p.pos.distance(i));
                     if pos.distance(mouse_pos) <= p.size {
@@ -120,7 +123,7 @@ impl epi::App for App {
                         else{
                             pos - mouse_pos
                         };
-                        self.particles.push(Plannet::new(
+                        self.particles.push(Planet::new(
                             pos + offset_pos,
                             (vel / 10.0) + offset_vel,
                             self.mass,
@@ -148,40 +151,17 @@ impl epi::App for App {
 
         let mut old = self.particles.clone();
         if !self.paused{
-            self.particles.iter_mut().for_each(|p| {
-                if if let Some(l) = p.trail.last() {
-                    (*l - p.pos).length_sq() > self.min_trail_update.powf(2.0)
-                } else {
-                    true
-                } {
-                    p.trail.push(p.pos);
-                    if p.trail.len() > 100 {
-                        p.trail.remove(0);
-                    }
-                }
-            });
-            self.particles.iter_mut().for_each(|p| p.pos += p.vel);
-
-            self.particles.iter_mut().for_each(|p| {
-                p.vel += old
-                .iter()
-                .filter(|d| d.id != p.id)
-                .map(|d| {
-                    // (d.pos - p.pos).normalized() * dt * (self.gravity * p.mass * d.mass)
-                    (d.pos - p.pos).normalized() * dt * (self.gravity.powf(2.0) * d.mass)
-                    / d.pos.distance_sq(p.pos)
-                })
-                .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
-            });
+            self.particles.iter_mut().for_each(|p| p.update(&old, self.min_trail_update, self.gravity, dt));
         }
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut responces = vec![
-                ui.add(egui::Slider::new(&mut self.gravity, 0.0..=500.0).text("gravity")),
+                ui.add(egui::Slider::new(&mut self.gravity, 0.0..=100.0).text("gravity")),
                 ui.add(egui::Slider::new(&mut self.mass, 1.0..=100.0).text("mass")),
                 ui.add(egui::Slider::new(&mut self.size, 1.0..=100.0).text("size")),
                 ui.add(
                     egui::Slider::new(&mut self.min_trail_update, 0.1..=2.0).text("trial length"),
                 ),
+                ui.add(egui::Slider::new(&mut self.preview_length, 100..=2000).text("preview length")),
                 ui.checkbox(&mut self.force_fields, "force arrows"),
             ];
             if self.force_fields{
@@ -253,9 +233,9 @@ impl epi::App for App {
                         let top = (y as f32/key_points_dist).floor() as usize;
                         let bottom = (y as f32/key_points_dist).ceil() as usize;
                         let y_frac = (y as f32/key_points_dist).fract();
-                        let any_close = [key_points[left][bottom], key_points[right][bottom], key_points[left][top], key_points[right][top]].iter().map(|e| e.2).max().unwrap();
-                        if any_close != 1{
-                            let vel = if any_close == 2{
+                        let all_close = [key_points[left][bottom], key_points[right][bottom], key_points[left][top], key_points[right][top]].iter().map(|e| e.2).min().unwrap();
+                        if all_close != 1{
+                            let vel = if all_close == 2{
                                 old
                                 .iter()
                                 .map(|d| {
@@ -327,7 +307,7 @@ impl epi::App for App {
                     let mut offset_pos = egui::Vec2::ZERO;
                     let mut offset_vel = egui::Vec2::ZERO;
                     if self.selected >= 0 {
-                        old.iter().for_each(&mut |p: &Plannet| {
+                        old.iter().for_each(&mut |p: &Planet| {
                             if p.id == self.selected {
                                 offset_pos =
                                     p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
@@ -335,7 +315,7 @@ impl epi::App for App {
                             }
                         });
                     }
-                    old.push(Plannet::new(
+                    old.push(Planet::new(
                         pos + offset_pos,
                         (vel / 10.0) + offset_vel,
                         self.mass,
@@ -344,11 +324,11 @@ impl epi::App for App {
                         egui::Color32::GREEN
                     ));
                     let mut last_points: Option<Vec<_>> = None;
-                    for _ in 0..300 {
+                    for _ in 0..self.preview_length {
                         let temp = old.clone();
                         let mut offset_pos = egui::Vec2::ZERO;
                         if self.selected >= 0 {
-                            old.iter().for_each(&mut |p: &Plannet| {
+                            old.iter().for_each(&mut |p: &Planet| {
                                 if p.id == self.selected {
                                     offset_pos =
                                         p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
@@ -369,19 +349,8 @@ impl epi::App for App {
                                 )
                             }
                         }
-                        last_points = Some(new_points.map(|e|e.0).collect());
-                        old.iter_mut().for_each(|d| d.pos += d.vel);
-                        old.iter_mut().for_each(|p| {
-                            p.vel += temp
-                                .iter()
-                                .filter(|d| d.id != p.id)
-                                .map(|d| {
-                                    // (d.pos - p.pos).normalized() * dt * (self.gravity * p.mass * d.mass)
-                                    (d.pos - p.pos).normalized() * dt * (self.gravity.powf(2.0) * d.mass)
-                                        / d.pos.distance_sq(p.pos)
-                                })
-                                .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
-                        });
+                        last_points = Some(new_points.map(|e| e.0).collect());
+                        old.iter_mut().for_each(|p| p.update(&temp, self.min_trail_update, self.gravity, dt));
                     }
                 }
             }
