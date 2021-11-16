@@ -190,7 +190,7 @@ impl epi::App for App {
             if self.force_fields {
                 let size = ctx.available_rect().size();
                 let mut key_points = Vec::new();
-                let key_points_dist = 3.0;
+                let key_points_dist = 4.0;
                 for x in 0..((size.x / self.arrow_size)/key_points_dist).ceil() as usize + 1{
                     for y in 0..((size.y / self.arrow_size)/key_points_dist).ceil() as usize + 1{
                         let pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size * key_points_dist) + selected_pos;
@@ -236,7 +236,7 @@ impl epi::App for App {
                         let bottom = (y as f32/key_points_dist).ceil() as usize;
                         let y_frac = (y as f32/key_points_dist).fract();
                         let highest_rendering_level = [key_points[left][bottom], key_points[right][bottom], key_points[left][top], key_points[right][top]].iter().map(|e| e.2).max().unwrap();
-                        if highest_rendering_level != 1{
+                        if highest_rendering_level > 0{
                             let vel = if highest_rendering_level == 2{
                                 old
                                 .iter()
