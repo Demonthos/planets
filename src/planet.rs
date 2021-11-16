@@ -25,6 +25,18 @@ impl Planet {
         }
     }
 
+    pub fn get_force(pos: egui::Pos2, id: i32, old: &Vec<Self>) -> egui::Vec2{
+        old
+            .iter()
+            .filter(|d| d.id != id)
+            .map(|d| {
+                // (d.pos - self.pos).normalized() * dt * (self.gravity * self.mass * d.mass)
+                (d.pos - pos).normalized() * d.mass
+                / d.pos.distance_sq(pos)
+            })
+            .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
+    }
+
     pub fn update(&mut self, old: &Vec<Self>, min_trail_update: f32, gravity: f32, dt: f32){
         if if let Some(l) = self.trail.last() {
             (*l - self.pos).length_sq() > min_trail_update.powf(2.0)
@@ -39,14 +51,6 @@ impl Planet {
 
         self.pos += self.vel;
 
-        self.vel += old
-            .iter()
-            .filter(|d| d.id != self.id)
-            .map(|d| {
-                // (d.pos - self.pos).normalized() * dt * (self.gravity * self.mass * d.mass)
-                (d.pos - self.pos).normalized() * dt * (gravity.powf(2.0) * d.mass)
-                / d.pos.distance_sq(self.pos)
-            })
-            .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
+        self.vel += Self::get_force(self.pos, self.id, old) * dt * gravity.powf(2.0);
     }
 }

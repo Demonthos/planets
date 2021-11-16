@@ -112,13 +112,15 @@ impl epi::App for App {
             if self.selected < 0 {
                 if let Some(pos) = self.creating {
                     if pointer.any_released() {
-                        let vel = if ctx.input().modifiers.shift{
-                            if let Some(nearest) = self.particles.iter().max_by(|e1, e2| (e1.mass/e1.pos.distance_sq(mouse_pos)).partial_cmp(&(e2.mass/e2.pos.distance_sq(mouse_pos))).unwrap()){
-                                (nearest.pos - pos).normalized().rot90()*pos.distance(mouse_pos)
-                            }
-                            else{
-                                pos - mouse_pos
-                            }
+                        let vel: egui::Vec2 = if ctx.input().modifiers.shift{
+                            // angle = 90 + grav.angle
+                            // grav + x = mag@angle
+                            // x = mag@angle - grav
+                            let grav = Planet::get_force(pos, -1, &self.particles) * dt * self.gravity.powf(2.0);
+                            let total_mass: f32 = self.particles.iter().map(|p| p.mass).sum();
+                            let angle = grav.rot90().angle();
+                            let force = pos.distance(mouse_pos)*egui::Vec2::angled(angle) - grav;
+                            force
                         }
                         else{
                             pos - mouse_pos
@@ -211,7 +213,7 @@ impl epi::App for App {
                         if y == 0{
                             key_points.push(Vec::new());
                         }
-                        key_points.last_mut().unwrap().push((vel, color, if min_dist_sq < 1000.0 {2} else if color < 0.1 {0} else {1}))
+                        key_points.last_mut().unwrap().push((vel, color, if min_dist_sq < 2000.0 {2} else if color < 0.1 {0} else {1}))
                     }
                 }
 
@@ -233,9 +235,9 @@ impl epi::App for App {
                         let top = (y as f32/key_points_dist).floor() as usize;
                         let bottom = (y as f32/key_points_dist).ceil() as usize;
                         let y_frac = (y as f32/key_points_dist).fract();
-                        let highest_rending_level = [key_points[left][bottom], key_points[right][bottom], key_points[left][top], key_points[right][top]].iter().map(|e| e.2).max().unwrap();
-                        if highest_rending_level != 1{
-                            let vel = if highest_rending_level == 2{
+                        let highest_rendering_level = [key_points[left][bottom], key_points[right][bottom], key_points[left][top], key_points[right][top]].iter().map(|e| e.2).max().unwrap();
+                        if highest_rendering_level != 1{
+                            let vel = if highest_rendering_level == 2{
                                 old
                                 .iter()
                                 .map(|d| {
@@ -292,13 +294,15 @@ impl epi::App for App {
             if let Some(pos) = self.creating {
                 painter.circle_filled(pos, self.size, egui::Color32::GREEN);
                 if let Some(mouse_pos) = pointer.interact_pos() {
-                    let vel = if ctx.input().modifiers.shift{
-                        if let Some(nearest) = self.particles.iter().max_by(|e1, e2| (e1.mass/e1.pos.distance_sq(mouse_pos)).partial_cmp(&(e2.mass/e2.pos.distance_sq(mouse_pos))).unwrap()){
-                            (nearest.pos - pos).normalized().rot90()*pos.distance(mouse_pos)
-                        }
-                        else{
-                            pos - mouse_pos
-                        }
+                    let vel: egui::Vec2 = if ctx.input().modifiers.shift{
+                        // angle = 90 + grav.angle
+                        // grav + x = mag@angle
+                        // x = mag@angle - grav
+                        let grav = Planet::get_force(pos, -1, &self.particles) * dt * self.gravity.powf(2.0);
+                        let total_mass: f32 = self.particles.iter().map(|p| p.mass).sum();
+                        let angle = grav.rot90().angle();
+                        let force = pos.distance(mouse_pos)*egui::Vec2::angled(angle) - grav;
+                        force
                     }
                     else{
                         pos - mouse_pos
