@@ -113,14 +113,22 @@ impl epi::App for App {
                 if let Some(pos) = self.creating {
                     if pointer.any_released() {
                         let vel: egui::Vec2 = if ctx.input().modifiers.shift{
-                            // angle = 90 + grav.angle
-                            // grav + x = mag@angle
-                            // x = mag@angle - grav
-                            let grav = Planet::get_force(pos + offset_pos, -1, &self.particles) * dt * self.gravity.powf(2.0);
-                            let total_mass: f32 = self.particles.iter().map(|p| p.mass).sum();
+                            let grav = Planet::get_force(pos + offset_pos, -1, &self.particles) * self.gravity.powf(2.0);
+                            let offset = grav.normalized().rot90()*25.0;
+                            let grav_slope = grav.y/grav.x;
+                            let grav_offset = Planet::get_force(pos + offset_pos + offset, -1, &self.particles) * self.gravity.powf(2.0);
+                            let grav_offset_slope = grav_offset.y/grav_offset.x;
+                            // gm1m2/r^2 = m1v^2/r = gravm1
+                            let c = pos.y - pos.x*grav_slope;
+                            let d = pos.y + offset.y - (pos.x + offset.x)*grav_offset_slope;
+                            let x = (d-c)/(grav_slope-grav_offset_slope);
+                            let y = x*grav_slope + c;
+                            let grav_pos = egui::Pos2::new(x, y);
+                            let r = (pos-grav_pos).length();
+                            let grav_mass = grav.length()*r.powf(2.0)*self.mass/self.gravity.powf(2.0);
                             let angle = grav.rot90().angle();
-                            let force = pos.distance(mouse_pos)*egui::Vec2::angled(angle) - grav;
-                            force
+                            let vel = (r*grav.length()).sqrt()*egui::Vec2::angled(angle);
+                            vel
                         }
                         else{
                             pos - mouse_pos
@@ -306,14 +314,24 @@ impl epi::App for App {
                         });
                     }
                     let vel: egui::Vec2 = if ctx.input().modifiers.shift{
-                        // angle = 90 + grav.angle
-                        // grav + x = mag@angle
-                        // x = mag@angle - grav
-                        let grav = Planet::get_force(pos + offset_pos, -1, &self.particles) * dt * self.gravity.powf(2.0);
-                        let total_mass: f32 = self.particles.iter().map(|p| p.mass).sum();
+                        let grav = Planet::get_force(pos + offset_pos, -1, &self.particles) * self.gravity.powf(2.0);
+                        painter.line_segment([pos, pos + grav.normalized()*2000.0], egui::Stroke::new(1.0, egui::Color32::RED));
+                        let offset = grav.normalized().rot90()*25.0;
+                        let grav_slope = grav.y/grav.x;
+                        let grav_offset = Planet::get_force(pos + offset_pos + offset, -1, &self.particles) * self.gravity.powf(2.0);
+                        painter.line_segment([pos + offset, pos + offset + grav_offset.normalized()*2000.0], egui::Stroke::new(1.0, egui::Color32::RED));
+                        let grav_offset_slope = grav_offset.y/grav_offset.x;
+                        // gm1m2/r^2 = m1v^2/r = gravm1
+                        let c = pos.y - pos.x*grav_slope;
+                        let d = pos.y + offset.y - (pos.x + offset.x)*grav_offset_slope;
+                        let x = (d-c)/(grav_slope-grav_offset_slope);
+                        let y = x*grav_slope + c;
+                        let grav_pos = egui::Pos2::new(x, y);
+                        let r = (pos-grav_pos).length();
+                        let grav_mass = grav.length()*r.powf(2.0)*self.mass/self.gravity.powf(2.0);
                         let angle = grav.rot90().angle();
-                        let force = pos.distance(mouse_pos)*egui::Vec2::angled(angle) - grav;
-                        force
+                        let vel = (r*grav.length()).sqrt()*egui::Vec2::angled(angle);
+                        vel
                     }
                     else{
                         pos - mouse_pos
@@ -358,8 +376,6 @@ impl epi::App for App {
                     }
                 }
             }
-            // let com = self.particles.center_of_mass();
-            // painter.circle_filled(com.1, com.0, egui::Color32::RED);
             egui::warn_if_debug_build(ui);
         });
     }
