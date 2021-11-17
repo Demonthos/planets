@@ -9,11 +9,18 @@ pub struct Planet {
     pub size: f32,
     pub id: i32,
     pub trail: Vec<egui::Pos2>,
-    pub color: egui::Color32
+    pub color: egui::Color32,
 }
 
 impl Planet {
-    pub fn new(pos: egui::Pos2, vel: egui::Vec2, mass: f32, size: f32, id: i32, color: impl Into<egui::Color32>) -> Self {
+    pub fn new(
+        pos: egui::Pos2,
+        vel: egui::Vec2,
+        mass: f32,
+        size: f32,
+        id: i32,
+        color: impl Into<egui::Color32>,
+    ) -> Self {
         Self {
             pos,
             vel,
@@ -21,23 +28,21 @@ impl Planet {
             size,
             id,
             trail: Vec::new(),
-            color: color.into()
+            color: color.into(),
         }
     }
 
-    pub fn get_force(pos: egui::Pos2, id: i32, old: &Vec<Self>) -> egui::Vec2{
-        old
-            .iter()
+    pub fn get_force(pos: egui::Pos2, id: i32, old: &Vec<Self>) -> egui::Vec2 {
+        old.iter()
             .filter(|d| d.id != id)
             .map(|d| {
                 // (d.pos - self.pos).normalized() * dt * (self.gravity * self.mass * d.mass)
-                (d.pos - pos).normalized() * d.mass
-                / d.pos.distance_sq(pos)
+                (d.pos - pos).normalized() * d.mass / d.pos.distance_sq(pos)
             })
             .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
     }
 
-    pub fn update(&mut self, old: &Vec<Self>, min_trail_update: f32, gravity: f32, dt: f32){
+    pub fn update(&mut self, old: &Vec<Self>, min_trail_update: f32, gravity: f32, dt: f32) {
         if if let Some(l) = self.trail.last() {
             (*l - self.pos).length_sq() > min_trail_update.powf(2.0)
         } else {

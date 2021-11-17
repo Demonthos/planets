@@ -1,6 +1,6 @@
-use rand::prelude::*;
 use crate::planet::Planet;
 use eframe::{egui, epi};
+use rand::prelude::*;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -93,8 +93,7 @@ impl epi::App for App {
             if self.selected >= 0 {
                 self.particles.iter().for_each(&mut |p: &Planet| {
                     if p.id == self.selected {
-                        offset_pos =
-                        p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
+                        offset_pos = p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
                         offset_vel = p.vel;
                     }
                 });
@@ -102,7 +101,7 @@ impl epi::App for App {
             if pointer.any_released() {
                 self.selected = -1;
                 self.particles.iter().for_each(&mut |p: &Planet| {
-                    let pos = p.pos-offset_pos;
+                    let pos = p.pos - offset_pos;
                     // println!("{:?}", p.pos.distance(i));
                     if pos.distance(mouse_pos) <= p.size {
                         self.selected = p.id;
@@ -112,34 +111,44 @@ impl epi::App for App {
             if self.selected < 0 {
                 if let Some(pos) = self.creating {
                     if pointer.any_released() {
-                        let vel: egui::Vec2 = if ctx.input().modifiers.shift{
-                            let grav = Planet::get_force(pos + offset_pos, -1, &self.particles) * self.gravity.powf(2.0);
-                            let offset = grav.normalized().rot90()*25.0;
-                            let grav_slope = grav.y/grav.x;
-                            let grav_offset = Planet::get_force(pos + offset_pos + offset, -1, &self.particles) * self.gravity.powf(2.0);
-                            let grav_offset_slope = grav_offset.y/grav_offset.x;
+                        let vel: egui::Vec2 = if ctx.input().modifiers.shift {
+                            let grav = Planet::get_force(pos + offset_pos, -1, &self.particles)
+                                * dt
+                                * self.gravity.powf(2.0);
+                            let offset = grav.normalized().rot90() * 25.0;
+                            let grav_slope = grav.y / grav.x;
+                            let grav_offset =
+                                Planet::get_force(pos + offset_pos + offset, -1, &self.particles)
+                                    * dt
+                                    * self.gravity.powf(2.0);
+                            let grav_offset_slope = grav_offset.y / grav_offset.x;
                             // gm1m2/r^2 = m1v^2/r = gravm1
-                            let c = pos.y - pos.x*grav_slope;
-                            let d = pos.y + offset.y - (pos.x + offset.x)*grav_offset_slope;
-                            let x = (d-c)/(grav_slope-grav_offset_slope);
-                            let y = x*grav_slope + c;
+                            let c = pos.y - pos.x * grav_slope;
+                            let d = pos.y + offset.y - (pos.x + offset.x) * grav_offset_slope;
+                            let x = (d - c) / (grav_slope - grav_offset_slope);
+                            let y = x * grav_slope + c;
                             let grav_pos = egui::Pos2::new(x, y);
-                            let r = (pos-grav_pos).length();
-                            let grav_mass = grav.length()*r.powf(2.0)*self.mass/self.gravity.powf(2.0);
+                            let r = (pos - grav_pos).length();
+                            let grav_mass =
+                                grav.length() * r.powf(2.0) * self.mass / self.gravity.powf(2.0);
                             let angle = grav.rot90().angle();
-                            let vel = (r*grav.length()).sqrt()*egui::Vec2::angled(angle);
+                            let vel = (r * grav.length()).sqrt() * egui::Vec2::angled(angle);
                             vel
-                        }
-                        else{
-                            pos - mouse_pos
+                        } else {
+                            (pos - mouse_pos) / 10.0
                         };
                         self.particles.push(Planet::new(
                             pos + offset_pos,
-                            (vel / 10.0) + offset_vel,
+                            vel + offset_vel,
                             self.mass,
                             self.size,
                             self.last_id,
-                            egui::color::Hsva::new(rand::random::<f32>(), 1.0, rand::random::<f32>(), 1.0)
+                            egui::color::Hsva::new(
+                                rand::random::<f32>(),
+                                1.0,
+                                rand::random::<f32>(),
+                                1.0,
+                            ),
                         ));
                         self.last_id += 1;
                         self.selected = old_selected;
@@ -155,13 +164,15 @@ impl epi::App for App {
             self.mass = self.mass.max(1.0);
         }
 
-        if ctx.input().key_pressed(egui::Key::Space){
+        if ctx.input().key_pressed(egui::Key::Space) {
             self.paused = !self.paused;
         }
 
         let mut old = self.particles.clone();
-        if !self.paused{
-            self.particles.iter_mut().for_each(|p| p.update(&old, self.min_trail_update, self.gravity, dt));
+        if !self.paused {
+            self.particles
+                .iter_mut()
+                .for_each(|p| p.update(&old, self.min_trail_update, self.gravity, dt));
         }
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut responces = vec![
@@ -171,11 +182,15 @@ impl epi::App for App {
                 ui.add(
                     egui::Slider::new(&mut self.min_trail_update, 0.1..=2.0).text("trial length"),
                 ),
-                ui.add(egui::Slider::new(&mut self.preview_length, 100..=2000).text("preview length")),
+                ui.add(
+                    egui::Slider::new(&mut self.preview_length, 100..=2000).text("preview length"),
+                ),
                 ui.checkbox(&mut self.force_fields, "force arrows"),
             ];
-            if self.force_fields{
-                responces.push(ui.add(egui::Slider::new(&mut self.arrow_size, 3.0..=60.0).text("arrow size")))
+            if self.force_fields {
+                responces.push(
+                    ui.add(egui::Slider::new(&mut self.arrow_size, 3.0..=60.0).text("arrow size")),
+                )
             }
             if responces.iter().any(|r| r.dragged() || r.hovered()) {
                 self.selected = old_selected;
@@ -199,16 +214,19 @@ impl epi::App for App {
                 let size = ctx.available_rect().size();
                 let mut key_points = Vec::new();
                 let key_points_dist = 4.0;
-                for x in 0..((size.x / self.arrow_size)/key_points_dist).ceil() as usize + 1{
-                    for y in 0..((size.y / self.arrow_size)/key_points_dist).ceil() as usize + 1{
-                        let pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size * key_points_dist) + selected_pos;
+                for x in 0..((size.x / self.arrow_size) / key_points_dist).ceil() as usize + 1 {
+                    for y in 0..((size.y / self.arrow_size) / key_points_dist).ceil() as usize + 1 {
+                        let pos = (egui::Vec2::new(x as f32, y as f32)
+                            * self.arrow_size
+                            * key_points_dist)
+                            + selected_pos;
                         let mut min_dist_sq = 10000.0;
                         let vel = old
                             .iter()
                             .map(|d| {
                                 // (d.pos - p.pos).normalized() * dt * (self.gravity * p.mass * d.mass)
                                 let dist_sq = d.pos.distance_sq(pos.to_pos2());
-                                if dist_sq < min_dist_sq{
+                                if dist_sq < min_dist_sq {
                                     min_dist_sq = dist_sq
                                 }
                                 (d.pos - pos).to_vec2().normalized()
@@ -218,70 +236,132 @@ impl epi::App for App {
                             })
                             .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2);
                         let color = (vel.length() * 10000.0 / (self.gravity.powf(2.0))).min(1.0);
-                        if y == 0{
+                        if y == 0 {
                             key_points.push(Vec::new());
                         }
-                        key_points.last_mut().unwrap().push((vel, color, if min_dist_sq < 2000.0 {2} else if color < 0.1 {0} else {1}))
+                        key_points.last_mut().unwrap().push((
+                            vel,
+                            color,
+                            if min_dist_sq < 2000.0 {
+                                2
+                            } else if color < 0.1 {
+                                0
+                            } else {
+                                1
+                            },
+                        ))
                     }
                 }
 
                 let x_size = (size.x.ceil() / self.arrow_size) as usize;
                 let y_size = (size.y.ceil() / self.arrow_size) as usize;
-                let mut arrows = if self.arrow_size > 5.0{
+                let mut arrows = if self.arrow_size > 5.0 {
                     Vec::new()
-                }
-                else{
-                    Vec::with_capacity(x_size*y_size)
+                } else {
+                    Vec::with_capacity(x_size * y_size)
                 };
                 let mut idx = 0;
                 for x in 0..x_size {
                     for y in 0..y_size {
-                        let mut pos = (egui::Vec2::new(x as f32, y as f32) * self.arrow_size) + selected_pos;
-                        let left = (x as f32/key_points_dist).floor() as usize;
-                        let right = (x as f32/key_points_dist).ceil() as usize;
-                        let x_frac = (x as f32/key_points_dist).fract();
-                        let top = (y as f32/key_points_dist).floor() as usize;
-                        let bottom = (y as f32/key_points_dist).ceil() as usize;
-                        let y_frac = (y as f32/key_points_dist).fract();
-                        let highest_rendering_level = [key_points[left][bottom], key_points[right][bottom], key_points[left][top], key_points[right][top]].iter().map(|e| e.2).max().unwrap();
-                        if highest_rendering_level > 0{
-                            let vel = if highest_rendering_level == 2{
-                                old
-                                .iter()
-                                .map(|d| {
-                                    // (d.pos - p.pos).normalized() * dt * (self.gravity * p.mass * d.mass)
-                                    (d.pos - pos).to_vec2().normalized()
-                                    * dt
-                                    * (self.gravity.powf(2.0) * d.mass)
-                                    / d.pos.distance_sq(pos.to_pos2())
-                                })
-                                .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
-                            }
-                            else{
-                                y_frac*(key_points[right][bottom].0*x_frac + key_points[left][bottom].0*(1.0-x_frac)) + (1.0-y_frac)*(key_points[right][top].0*x_frac + key_points[left][top].0*(1.0-x_frac))
+                        let mut pos =
+                            (egui::Vec2::new(x as f32, y as f32) * self.arrow_size) + selected_pos;
+                        let left = (x as f32 / key_points_dist).floor() as usize;
+                        let right = (x as f32 / key_points_dist).ceil() as usize;
+                        let x_frac = (x as f32 / key_points_dist).fract();
+                        let top = (y as f32 / key_points_dist).floor() as usize;
+                        let bottom = (y as f32 / key_points_dist).ceil() as usize;
+                        let y_frac = (y as f32 / key_points_dist).fract();
+                        let highest_rendering_level = [
+                            key_points[left][bottom],
+                            key_points[right][bottom],
+                            key_points[left][top],
+                            key_points[right][top],
+                        ]
+                        .iter()
+                        .map(|e| e.2)
+                        .max()
+                        .unwrap();
+                        if highest_rendering_level > 0 {
+                            let vel = if highest_rendering_level == 2 {
+                                old.iter()
+                                    .map(|d| {
+                                        // (d.pos - p.pos).normalized() * dt * (self.gravity * p.mass * d.mass)
+                                        (d.pos - pos).to_vec2().normalized()
+                                            * dt
+                                            * (self.gravity.powf(2.0) * d.mass)
+                                            / d.pos.distance_sq(pos.to_pos2())
+                                    })
+                                    .fold(egui::Vec2::ZERO, |v1, v2| v1 + v2)
+                            } else {
+                                y_frac
+                                    * (key_points[right][bottom].0 * x_frac
+                                        + key_points[left][bottom].0 * (1.0 - x_frac))
+                                    + (1.0 - y_frac)
+                                        * (key_points[right][top].0 * x_frac
+                                            + key_points[left][top].0 * (1.0 - x_frac))
                             };
-                            let color = y_frac*(key_points[right][bottom].1*x_frac + key_points[left][bottom].1*(1.0-x_frac)) + (1.0-y_frac)*(key_points[right][top].1*x_frac + key_points[left][top].1*(1.0-x_frac));
+                            let color = y_frac
+                                * (key_points[right][bottom].1 * x_frac
+                                    + key_points[left][bottom].1 * (1.0 - x_frac))
+                                + (1.0 - y_frac)
+                                    * (key_points[right][top].1 * x_frac
+                                        + key_points[left][top].1 * (1.0 - x_frac));
                             pos -= selected_pos;
-                            if arrows.is_empty(){
-                                painter.arrow(pos.to_pos2(), vel.normalized() * self.arrow_size, egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)));
-                            }
-                            else{
-                                arrows[idx] = egui::Shape::LineSegment{
-                                    points: [pos.to_pos2(), (pos + vel.normalized() * self.arrow_size).to_pos2()],
-                                    stroke: egui::Stroke::new(1.0, egui::color::Hsva::new(color, 1.0, 1.0, color)),
+                            if arrows.is_empty() {
+                                painter.arrow(
+                                    pos.to_pos2(),
+                                    vel.normalized() * self.arrow_size,
+                                    egui::Stroke::new(
+                                        1.0,
+                                        egui::color::Hsva::new(color, 1.0, 1.0, color),
+                                    ),
+                                );
+                            } else {
+                                arrows[idx] = egui::Shape::LineSegment {
+                                    points: [
+                                        pos.to_pos2(),
+                                        (pos + vel.normalized() * self.arrow_size).to_pos2(),
+                                    ],
+                                    stroke: egui::Stroke::new(
+                                        1.0,
+                                        egui::color::Hsva::new(color, 1.0, 1.0, color),
+                                    ),
                                 };
                                 idx += 1;
                             }
-                        }
-                        else{
+                        } else {
                             pos -= selected_pos;
-                            if arrows.is_empty(){
-                                painter.arrow(pos.to_pos2(), key_points[right][bottom].0.normalized() * self.arrow_size, egui::Stroke::new(1.0, egui::color::Hsva::new(key_points[right][bottom].1, 1.0, 1.0, key_points[right][bottom].1)));
-                            }
-                            else{
-                                arrows[idx] = egui::Shape::LineSegment{
-                                    points: [pos.to_pos2(), (pos + key_points[right][bottom].0.normalized() * self.arrow_size).to_pos2()],
-                                    stroke: egui::Stroke::new(1.0, egui::color::Hsva::new(key_points[right][bottom].1, 1.0, 1.0, key_points[right][bottom].1)),
+                            if arrows.is_empty() {
+                                painter.arrow(
+                                    pos.to_pos2(),
+                                    key_points[right][bottom].0.normalized() * self.arrow_size,
+                                    egui::Stroke::new(
+                                        1.0,
+                                        egui::color::Hsva::new(
+                                            key_points[right][bottom].1,
+                                            1.0,
+                                            1.0,
+                                            key_points[right][bottom].1,
+                                        ),
+                                    ),
+                                );
+                            } else {
+                                arrows[idx] = egui::Shape::LineSegment {
+                                    points: [
+                                        pos.to_pos2(),
+                                        (pos + key_points[right][bottom].0.normalized()
+                                            * self.arrow_size)
+                                            .to_pos2(),
+                                    ],
+                                    stroke: egui::Stroke::new(
+                                        1.0,
+                                        egui::color::Hsva::new(
+                                            key_points[right][bottom].1,
+                                            1.0,
+                                            1.0,
+                                            key_points[right][bottom].1,
+                                        ),
+                                    ),
                                 };
                                 idx += 1;
                             }
@@ -307,43 +387,45 @@ impl epi::App for App {
                     if self.selected >= 0 {
                         old.iter().for_each(&mut |p: &Planet| {
                             if p.id == self.selected {
-                                offset_pos =
-                                p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
+                                offset_pos = p.pos.to_vec2() - ctx.available_rect().size() / 2.0;
                                 offset_vel = p.vel;
                             }
                         });
                     }
-                    let vel: egui::Vec2 = if ctx.input().modifiers.shift{
-                        let grav = Planet::get_force(pos + offset_pos, -1, &self.particles) * self.gravity.powf(2.0);
-                        painter.line_segment([pos, pos + grav.normalized()*2000.0], egui::Stroke::new(1.0, egui::Color32::RED));
-                        let offset = grav.normalized().rot90()*25.0;
-                        let grav_slope = grav.y/grav.x;
-                        let grav_offset = Planet::get_force(pos + offset_pos + offset, -1, &self.particles) * self.gravity.powf(2.0);
-                        painter.line_segment([pos + offset, pos + offset + grav_offset.normalized()*2000.0], egui::Stroke::new(1.0, egui::Color32::RED));
-                        let grav_offset_slope = grav_offset.y/grav_offset.x;
+                    let vel: egui::Vec2 = if ctx.input().modifiers.shift {
+                        let grav = Planet::get_force(pos + offset_pos, -1, &self.particles)
+                            * dt
+                            * self.gravity.powf(2.0);
+                        let offset = grav.normalized().rot90() * 25.0;
+                        let grav_slope = grav.y / grav.x;
+                        let grav_offset =
+                            Planet::get_force(pos + offset_pos + offset, -1, &self.particles)
+                                * dt
+                                * self.gravity.powf(2.0);
+                        let grav_offset_slope = grav_offset.y / grav_offset.x;
                         // gm1m2/r^2 = m1v^2/r = gravm1
-                        let c = pos.y - pos.x*grav_slope;
-                        let d = pos.y + offset.y - (pos.x + offset.x)*grav_offset_slope;
-                        let x = (d-c)/(grav_slope-grav_offset_slope);
-                        let y = x*grav_slope + c;
+                        let c = pos.y - pos.x * grav_slope;
+                        let d = pos.y + offset.y - (pos.x + offset.x) * grav_offset_slope;
+                        let x = (d - c) / (grav_slope - grav_offset_slope);
+                        let y = x * grav_slope + c;
                         let grav_pos = egui::Pos2::new(x, y);
-                        let r = (pos-grav_pos).length();
-                        let grav_mass = grav.length()*r.powf(2.0)*self.mass/self.gravity.powf(2.0);
+                        let r = (pos - grav_pos).length();
+                        let grav_mass =
+                            grav.length() * r.powf(2.0) * self.mass / self.gravity.powf(2.0);
                         let angle = grav.rot90().angle();
-                        let vel = (r*grav.length()).sqrt()*egui::Vec2::angled(angle);
+                        let vel = (r * grav.length()).sqrt() * egui::Vec2::angled(angle);
                         vel
-                    }
-                    else{
-                        pos - mouse_pos
+                    } else {
+                        (pos - mouse_pos) / 10.0
                     };
                     painter.arrow(pos, vel, egui::Stroke::new(1.0, egui::Color32::GREEN));
                     old.push(Planet::new(
                         pos + offset_pos,
-                        (vel / 10.0) + offset_vel,
+                        vel + offset_vel,
                         self.mass,
                         self.size,
                         self.last_id,
-                        egui::Color32::GREEN
+                        egui::Color32::GREEN,
                     ));
                     let mut last_points: Option<Vec<_>> = None;
                     for _ in 0..self.preview_length {
@@ -358,21 +440,19 @@ impl epi::App for App {
                             });
                         }
                         let new_points = old.iter().map(|e| (e.pos - offset_pos, e.color));
-                        if let Some(ops) = last_points{
-                            for (i, ps) in ops.iter().zip(new_points.clone()).enumerate(){
+                        if let Some(ops) = last_points {
+                            for (i, ps) in ops.iter().zip(new_points.clone()).enumerate() {
                                 let (pos, color) = ps.1;
                                 let mut color: egui::color::Hsva = color.into();
-                                if i != temp.len() - 1{
+                                if i != temp.len() - 1 {
                                     color.s /= 2.0;
                                 }
-                                painter.line_segment(
-                                    [*ps.0, pos],
-                                    egui::Stroke::new(2.0, color),
-                                )
+                                painter.line_segment([*ps.0, pos], egui::Stroke::new(2.0, color))
                             }
                         }
                         last_points = Some(new_points.map(|e| e.0).collect());
-                        old.iter_mut().for_each(|p| p.update(&temp, self.min_trail_update, self.gravity, dt));
+                        old.iter_mut()
+                            .for_each(|p| p.update(&temp, self.min_trail_update, self.gravity, dt));
                     }
                 }
             }
