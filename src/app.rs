@@ -129,8 +129,6 @@ impl epi::App for App {
                             let y = x * grav_slope + c;
                             let grav_pos = egui::Pos2::new(x, y);
                             let r = (pos - grav_pos).length();
-                            let grav_mass =
-                                grav.length() * r.powf(2.0) * self.mass / self.gravity.powf(2.0);
                             let angle = grav.rot90().angle();
                             let vel = (r * grav.length()).sqrt() * egui::Vec2::angled(angle);
                             vel
@@ -410,8 +408,6 @@ impl epi::App for App {
                         let y = x * grav_slope + c;
                         let grav_pos = egui::Pos2::new(x, y);
                         let r = (pos - grav_pos).length();
-                        let grav_mass =
-                            grav.length() * r.powf(2.0) * self.mass / self.gravity.powf(2.0);
                         let angle = grav.rot90().angle();
                         let vel = (r * grav.length()).sqrt() * egui::Vec2::angled(angle);
                         vel
